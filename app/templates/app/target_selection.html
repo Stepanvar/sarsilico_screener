@@ -1,0 +1,20 @@
+{% extends 'app/layout.html' %}
+
+{% block content %}
+<h2>Select SARS-CoV-2 Target Protein</h2>
+<form method="post" class="mb-3">
+	{% csrf_token %}
+	{{ form.non_field_errors }}
+	<div class="form-group">
+		{{ form.target_id.label_tag }}
+		{{ form.target_id }}
+	</div>
+	<button type="submit" class="btn btn-primary">Start Docking</button>
+</form>
+<h5>Available Targets</h5>
+<ul>
+	{% for t in targets %}
+	<li>{{ t.name }} - {{ t.description }}</li>
+	{% endfor %}
+</ul>
+{% endblock %}

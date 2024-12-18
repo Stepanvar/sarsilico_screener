@@ -1,0 +1,30 @@
+{% extends 'app/layout.html' %}
+{% load static %}
+{% block content %}
+<h2>Docking Results</h2>
+{% if job.status == 'COMPLETED' %}
+<h3>Affinity Scores</h3>
+<ul>
+	{% for score in scores %}
+	<li>{{ score }}</li>
+	{% endfor %}
+</ul>
+<h3>3D Visualization</h3>
+<div id="viewport" style="width:600px; height:400px; border:1px solid #ccc;"></div>
+<script src="https://cdn.jsdelivr.net/npm/ngl"></script>
+<script>
+	var stage = new NGL.Stage("viewport");
+	// Replace with actual docked file path once available
+	stage.loadFile("/path/to/{{ job.job_id }}_docked.pdbqt").then(function (o) {
+		o.addRepresentation("cartoon");
+		stage.autoView();
+	});
+</script>
+{% elif job.status == 'RUNNING' %}
+<p>Your job is currently running. Please refresh later.</p>
+{% elif job.status == 'FAILED' %}
+<div class="alert alert-danger">The job failed. Details: {{ job.results }}</div>
+{% else %}
+<p>Job Status: {{ job.status }}</p>
+{% endif %}
+{% endblock %}

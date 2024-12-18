@@ -1,0 +1,35 @@
+{% extends 'app/layout.html' %}
+
+{% block content %}
+<h2>Upload PDB File</h2>
+<form id="pdb-upload-form" method="post" enctype="multipart/form-data">
+	{% csrf_token %}
+	{{ form.as_p }}
+	<div id="drop-zone" class="form-control" style="border: 2px dashed #ccc; padding: 20px; text-align: center;">
+		Drag and drop files here
+	</div>
+	<button type="submit" class="btn btn-success">Upload</button>
+</form>
+<script>
+	const dropZone = document.getElementById('drop-zone');
+	const fileInput = document.getElementById('id_pdb_file');
+
+	dropZone.addEventListener('dragover', (e) => {
+		e.preventDefault();
+		dropZone.style.borderColor = '#333';
+	});
+
+	dropZone.addEventListener('dragleave', () => {
+		dropZone.style.borderColor = '#ccc';
+	});
+
+	dropZone.addEventListener('drop', (e) => {
+		e.preventDefault();
+		dropZone.style.borderColor = '#ccc';
+		const files = e.dataTransfer.files;
+		if (files.length > 0) {
+			fileInput.files = files;
+		}
+	});
+</script>
+{% endblock %}

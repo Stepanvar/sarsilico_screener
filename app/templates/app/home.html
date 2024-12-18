@@ -1,0 +1,9 @@
+{% extends 'app/layout.html' %}
+
+{% block content %}
+<div class="jumbotron">
+	<h1>Welcome to SARSilico Screener</h1>
+	<p>Facilitating SARS-CoV-2 drug discovery through computational screening.</p>
+	<p><a class="btn btn-primary btn-lg" href="{% url 'smiles_input' %}" role="button">Get Started</a></p>
+</div>
+{% endblock %}

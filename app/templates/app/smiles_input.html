@@ -1,0 +1,50 @@
+{% extends 'app/layout.html' %}
+
+{% load static %}
+
+{% block content %}
+<h2>Submit Small Molecule</h2>
+<form method="post" enctype="multipart/form-data" class="mb-3">
+	{% csrf_token %}
+	{{ form.non_field_errors }}
+	<div class="form-group">
+		{{ form.smiles.label_tag }}
+		{{ form.smiles }}
+		{% if form.smiles.errors %}
+		<div class="text-danger">{{ form.smiles.errors }}</div>
+		{% endif %}
+	</div>
+	<div class="form-group">
+		{{ form.smiles_file.label_tag }}
+		{{ form.smiles_file }}
+		{% if form.smiles_file.errors %}
+		<div class="text-danger">{{ form.smiles_file.errors }}</div>
+		{% endif %}
+	</div>
+	<button type="submit" class="btn btn-success">Submit</button>
+</form>
+<hr>
+<h3>Draw Molecule</h3>
+<div id="marvin-sketch"></div>
+<script>
+	let sketcherInstance;
+
+	MarvinJSUtil.getEditor("marvin-sketch").then(function (instance) {
+		sketcherInstance = instance;
+		sketcherInstance.on("structureChange", function () {
+			sketcherInstance.exportStructure("smiles").then(function (smiles) {
+				document.getElementById("id_smiles").value = smiles;
+			}).catch(function (error) {
+				console.error("Error exporting structure:", error);
+			});
+		});
+	}).catch(function (error) {
+		console.error("Error initializing Marvin JS editor:", error);
+	});
+
+</script>
+{% endblock %}
+{% block scripts %}
+<script src="{% static 'app/scripts/marvinjslauncher.js' %}"></script>
+<script src="{% static 'app/scripts/promise-1.0.0.min.js' %}"></script>
+{% endblock %}

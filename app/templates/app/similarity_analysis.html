@@ -1,0 +1,18 @@
+{% extends 'app/layout.html' %}
+{% load static %}
+{% block content %}
+<h2>Similarity and Drug Repurposing Analysis</h2>
+<form method="post" class="mb-3">
+	{% csrf_token %}
+	{{ form.non_field_errors }}
+	<div class="form-group">
+		{{ form.smiles.label_tag }}
+		{{ form.smiles }}
+	</div>
+	<div class="form-group">
+		{{ form.threshold.label_tag }}
+		{{ form.threshold }}
+	</div>
+	<button type="submit" class="btn btn-primary">Analyze</button>
+</form>
+{% endblock %}
