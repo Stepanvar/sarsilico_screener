@@ -1,0 +1,51 @@
+{% extends 'app/layout.html' %}
+{% block title %}Similarity Results - SARS-CoV-2 Research Platform{% endblock %}
+{% block content %}
+<div class="mt-4">
+    <h2>Similarity Analysis Results</h2>
+    {% if job.status == 'COMPLETED' and results %}
+        <p>Job ID: {{ job.job_id }}</p>
+        <p>Status: {{ job.status }}</p>
+        <h3>Drugs Above Threshold:</h3>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>SMILES</th>
+                    <th>Similarity Score</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for drug in results.drugs %}
+                    <tr>
+                        <td>{{ drug.name }}</td>
+                        <td>{{ drug.smiles }}</td>
+                        <td>{{ drug.score }}</td>
+                        <td>{{ drug.description }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <h3>3D Visualization</h3>
+        <div id="viewport" style="width:600px; height:400px; border:1px solid #ccc;"></div>
+        <script src="https://cdn.jsdelivr.net/npm/ngl"></script>
+        <script>
+            var stage = new NGL.Stage("viewport");
+            // Replace with actual docked file path once available
+            stage.loadFile("/path/to/{{ job.job_id }}_docked.pdbqt").then(function (o) {
+                o.addRepresentation("cartoon");
+                stage.autoView();
+            });
+        </script>
+    {% elif job.status == 'FAILED' %}
+        <p>Job ID: {{ job.job_id }}</p>
+        <p>Status: {{ job.status }}</p>
+        <p>Error: {{ job.results }}</p>
+    {% else %}
+        <p>Job ID: {{ job.job_id }}</p>
+        <p>Status: {{ job.status }}</p>
+        <p>Please wait for the similarity analysis to complete.</p>
+    {% endif %}
+</div>
+{% endblock %}

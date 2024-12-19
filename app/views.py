@@ -1,13 +1,14 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse, JsonResponse
-import subprocess
-import uuid
-from .forms import SMILESInputForm, PDBUploadForm, SequenceForm, TargetSelectionForm, SimilarityForm
+from django.core.files.uploadedfile import SimpleUploadedFile
+from .forms import SMILESInputForm, PDBUploadForm, SimilarityForm, DockingForm, SequenceForm, TargetSelectionForm, UserRegistrationForm, TargetSelectionForm
 from .models import Job, Target, KnownDrug
-from .tasks import process_sequence_task, perform_docking_task, similarity_analysis_task
-from .utils import validate_pdb_file, validate_smiles
+from .tasks import perform_docking_task, perform_similarity_analysis_task
+from .utils import validate_smiles, validate_pdb_file, run_pepsmi, run_alphafold_convert
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
+import uuid
 
 def home_view(request):
     return render(request, 'app/home.html')
@@ -34,69 +35,153 @@ def logout_view(request):
     logout(request)
     return redirect('home')
 
-def convert_to_smiles(request):
-    if request.method == "POST":
-        sequence = request.POST.get("sequence", "").strip()
-        if not sequence:
-            return JsonResponse({"error": "No sequence provided."}, status=400)
-
-        try:
-            result = subprocess.run(
-                ["pepsmi", sequence], capture_output=True, text=True, check=True
-            )
-            smiles = result.stdout.strip()
-            return JsonResponse({"smiles": smiles})
-        except subprocess.CalledProcessError as e:
-            return JsonResponse({"error": f"Conversion failed: {e.stderr}"}, status=500)
-    return JsonResponse({"error": "Invalid request method."}, status=405)
-
 def smiles_input_view(request):
     if request.method == 'POST':
         form = SMILESInputForm(request.POST, request.FILES)
         if form.is_valid():
             smiles = form.cleaned_data.get('smiles')
             smiles_file = form.cleaned_data.get('smiles_file')
+
+            if smiles:
+                is_valid, error = validate_smiles(smiles)
+                if not is_valid:
+                    form.add_error('smiles', str(error))
+                    return render(request, 'app/smiles_input.html', {'form': form})
+
             if smiles_file:
-                content = smiles_file.read().decode('utf-8').strip()
-                smiles = content
-            if smiles and not validate_smiles(smiles):
-                form.add_error('smiles', 'Invalid SMILES')
-            else:
-                # Proceed with similarity check or docking
-                return redirect('similarity_analysis')
+                file_content = smiles_file.read().decode('utf-8').strip()
+                is_valid, error = validate_smiles(file_content)
+                if not is_valid:
+                    form.add_error('smiles_file', str(error))
+                    return render(request, 'app/smiles_input.html', {'form': form})
+
+            messages.success(request, 'SMILES input successfully validated and processed.')
+            return redirect('docking_results', job_id='some-job-id')  # Adjust job_id as needed
     else:
         form = SMILESInputForm()
     return render(request, 'app/smiles_input.html', {'form': form})
-
 
 def pdb_upload_view(request):
     if request.method == 'POST':
         form = PDBUploadForm(request.POST, request.FILES)
         if form.is_valid():
             pdb_file = form.cleaned_data.get('pdb_file')
-            valid, error = validate_pdb_file(pdb_file)
-            if not valid:
-                form.add_error('pdb_file', error)
-            else:
-                # Save and redirect to target selection or docking
-                return redirect('target_selection')
+            is_valid, error = validate_pdb_file(pdb_file)
+            if not is_valid:
+                form.add_error('pdb_file', str(error))
+                return render(request, 'app/pdb_upload.html', {'form': form})
+
+            messages.success(request, 'PDB file successfully validated and processed.')
+            return redirect('docking_results', job_id='some-job-id')  # Adjust job_id as needed
     else:
         form = PDBUploadForm()
     return render(request, 'app/pdb_upload.html', {'form': form})
 
 @login_required
+def docking_view(request):
+    if request.method == 'POST':
+        form = DockingForm(request.POST)
+        if form.is_valid():
+            target = form.cleaned_data.get('target')
+            smiles = form.cleaned_data.get('smiles')
+            job = Job.objects.create(user=request.user, status='PENDING')
+            perform_docking_task.delay(target.id, smiles, job.job_id, request.user.email)
+            messages.success(request, 'Docking simulation initiated.')
+            return redirect('docking_results', job_id=job.job_id)
+    else:
+        form = DockingForm()
+    return render(request, 'app/docking.html', {'form': form})
+
+@login_required
+def docking_results_view(request, job_id):
+    job = get_object_or_404(Job, job_id=job_id, user=request.user)
+    # Parse affinity scores if completed
+    scores = []
+    if job.status == 'COMPLETED' and "Affinity scores:" in str(job.results):
+        result_str = str(job.results).split("Affinity scores:")[-1].strip().strip("[]")
+        scores = [s.strip("' ") for s in result_str.split(",")] if result_str else []
+    context = {'job': job, 'scores': scores}
+    return render(request, 'app/docking_results.html', context)
+
+@login_required
+def similarity_analysis_view(request):
+    if request.method == 'POST':
+        form = SimilarityForm(request.POST)
+        if form.is_valid():
+            smiles = form.cleaned_data['smiles']
+            threshold = form.cleaned_data['threshold']
+            job = Job.objects.create(user=request.user, status='PENDING')
+            perform_similarity_analysis_task.delay(smiles, threshold, job.job_id, request.user.email)
+            messages.success(request, 'Similarity analysis initiated.')
+            return redirect('similarity_results', job_id=job.job_id)
+    else:
+        form = SimilarityForm()
+    return render(request, 'app/similarity_analysis.html', {'form': form})
+
+@login_required
+def similarity_results_view(request, job_id):
+    job = get_object_or_404(Job, job_id=job_id, user=request.user)
+    results = None
+    if job.status == 'COMPLETED' and "Drugs above threshold:" in str(job.results):
+        # Extract the JSON-like structure from job.results
+        # Expected format: "Drugs above threshold: [{'name': '...', 'smiles': '...', 'score': ..., 'description': '...'}, ...]"
+        # You can safely use eval or json.loads after some manipulation if carefully sanitized
+        data_str = str(job.results).split("Drugs above threshold:")[-1].strip()
+        # Since we trust internal data, we can eval it. For production, parse more safely.
+        drugs = eval(data_str)
+        results = {'drugs': drugs}
+    context = {'job': job, 'results': results}
+    return render(request, 'app/similarity_results.html', context)
+
+@login_required
 def sequence_conversion_view(request):
     if request.method == 'POST':
-        form = SequenceForm(request.POST)
+        form = SequenceForm(request.POST, request.FILES)
         if form.is_valid():
-            sequence = form.cleaned_data['sequence']
-            job_id = str(uuid.uuid4())
-            job = Job.objects.create(user=request.user, job_id=job_id, status='PENDING')
-            process_sequence_task.delay(sequence, job_id)
-            return redirect('docking_results', job_id=job_id)
+            sequence = form.cleaned_data.get('sequence')
+            sequence_file = form.cleaned_data.get('sequence_file')
+            if sequence:
+                # Short sequence: run PepSMI
+                try:
+                    smiles = run_pepsmi(sequence)
+                    messages.success(request, f'Sequence converted to SMILES: {smiles}')
+                    return redirect('docking_results', job_id='some-job-id')
+                except ValueError as e:
+                    form.add_error(None, str(e))
+            elif sequence_file:
+                # Longer sequence: run AlphaFold convert
+                input_cif = handle_uploaded_file(sequence_file) # Implement file saving as needed
+                output_pdb = f"/path/to/output/{sequence_file.name}.pdb"
+                try:
+                    pdb = run_alphafold_convert(input_cif, output_pdb)
+                    messages.success(request, f'Sequence converted to PDB: {pdb}')
+                    return redirect('docking_results', job_id='some-job-id')
+                except ValueError as e:
+                    form.add_error(None, str(e))
     else:
         form = SequenceForm()
-    return render(request, 'app/sequence_input.html', {'form': form})
+    return render(request, 'app/sequence_conversion.html', {'form': form})
+
+def handle_uploaded_file(f):
+    file_path = f"/path/to/uploads/{f.name}"
+    with open(file_path, 'wb+') as destination:
+        for chunk in f.chunks():
+            destination.write(chunk)
+    return file_path
+
+def register_view(request):
+    if request.method == 'POST':
+        form = UserRegistrationForm(request.POST)
+        if form.is_valid():
+            form.save()
+            username = form.cleaned_data.get('username')
+            messages.success(request, f'Account created for {username}! You can now log in.')
+            return redirect('login')
+        else:
+            messages.error(request, 'Please correct the error below.')
+    else:
+        form = UserRegistrationForm()
+    return render(request, 'app/register.html', {'form': form})
 
 @login_required
 def target_selection_view(request):
@@ -115,36 +200,3 @@ def target_selection_view(request):
     else:
         form = TargetSelectionForm(targets=targets)
     return render(request, 'app/target_selection.html', {'form': form, 'targets': targets})
-
-@login_required
-def docking_results_view(request, job_id):
-    try:
-        job = Job.objects.get(job_id=job_id, user=request.user)
-    except Job.DoesNotExist:
-        return HttpResponse("Job not found.", status=404)
-
-    context = {'job': job, 'scores': []}
-    if job.status == 'COMPLETED' and "Affinity scores" in job.results:
-        # parse scores from job.results
-        # This is a simplification; in a real scenario, store results more structurally
-        scores_str = job.results.split("Affinity scores: ")[-1]
-        # Expected scores_str like ['-7.5', '-6.8']
-        scores_str = scores_str.strip().strip("[]").replace("'", "")
-        context['scores'] = scores_str.split(", ") if scores_str else []
-
-    return render(request, 'app/docking_results.html', context)
-
-@login_required
-def similarity_analysis_view(request):
-    if request.method == 'POST':
-        form = SimilarityForm(request.POST)
-        if form.is_valid():
-            smiles = form.cleaned_data['smiles']
-            threshold = form.cleaned_data['threshold']
-            job_id = str(uuid.uuid4())
-            job = Job.objects.create(user=request.user, job_id=job_id, status='PENDING')
-            similarity_analysis_task.delay(smiles, threshold, job_id, email=request.user.email)
-            return redirect('docking_results', job_id=job_id)
-    else:
-        form = SimilarityForm()
-    return render(request, 'app/similarity_analysis.html', {'form': form})
