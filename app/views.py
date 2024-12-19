@@ -50,7 +50,6 @@ def convert_to_smiles(request):
             return JsonResponse({"error": f"Conversion failed: {e.stderr}"}, status=500)
     return JsonResponse({"error": "Invalid request method."}, status=405)
 
-@login_required
 def smiles_input_view(request):
     if request.method == 'POST':
         form = SMILESInputForm(request.POST, request.FILES)
@@ -69,7 +68,7 @@ def smiles_input_view(request):
         form = SMILESInputForm()
     return render(request, 'app/smiles_input.html', {'form': form})
 
-@login_required
+
 def pdb_upload_view(request):
     if request.method == 'POST':
         form = PDBUploadForm(request.POST, request.FILES)
