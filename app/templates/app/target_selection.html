@@ -6,8 +6,8 @@
 	{% csrf_token %}
 	{{ form.non_field_errors }}
 	<div class="form-group">
-		{{ form.target_id.label_tag }}
-		{{ form.target_id }}
+		{{ form.target.label_tag }}
+		{{ form.target }}
 	</div>
 	<button type="submit" class="btn btn-primary">Start Docking</button>
 </form>

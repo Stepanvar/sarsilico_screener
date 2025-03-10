@@ -1,27 +1,30 @@
-{% load django_bootstrap5 %}
+{% load static django_bootstrap5 %}
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-	<meta charset="utf-8" />
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-	{% load static %}
-	<link rel="stylesheet" type="text/css" href="{% static 'app/content/site.css' %}" />
-	<script src="{% static 'app/scripts/modernizr-2.6.2.js' %}"></script>
-	{% bootstrap_css %}
-	{% block scripts %}{% endblock %}
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}SARSilico Screener{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'app/content/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'app/content/site.css' %}">
+    {% block extra_css %}{% endblock %}
 </head>
 <body>
-	{% include 'app/navbar.html' %}
-	<div class="container body-content">
-		{% block content %}{% endblock %}
-		<hr />
-		<footer>
-			<p>&copy; {{ current_year }} - SARSilico Screener</p>
-		</footer>
-	</div>
-	<script src="{% static 'app/scripts/jquery-1.10.2.js' %}"></script>
-	<script src="{% static 'app/scripts/respond.js' %}"></script>
-	{% bootstrap_javascript %}
+    {% include 'app/navbar.html' %}
+    
+    <main class="container mt-4">
+        {% bootstrap_messages %}
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="bg-dark text-white mt-5 py-4">
+        <div class="container">
+            <p class="mb-0">&copy; {% now "Y" %} SARSilico Screener</p>
+        </div>
+    </footer>
+
+    <script src="{% static 'app/scripts/jquery-3.6.0.min.js' %}"></script>
+    <script src="{% static 'app/scripts/bootstrap.bundle.min.js' %}"></script>
+    {% block extra_js %}{% endblock %}
 </body>
 </html>

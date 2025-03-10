@@ -1,0 +1,502 @@
+./app/models.py
+from django.db import models
+from django.contrib.auth.models import User
+import uuid
+
+class Job(models.Model):
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
+        ('RUNNING', 'Running'),
+        ('COMPLETED', 'Completed'),
+        ('FAILED', 'Failed'),
+    ]
+    
+    job_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDING')
+    results = models.TextField(null=True, blank=True)
+    results_binding_pose_path = models.CharField(max_length=500, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Job {self.job_id}"
+
+class KnownDrug(models.Model):
+    name = models.CharField(max_length=255)
+    smiles = models.CharField(max_length=255)
+    description = models.TextField()
+
+    def __str__(self):
+        return self.name
+
+class Target(models.Model):
+    name = models.CharField(max_length=255)
+    pdb_id = models.CharField(max_length=10)
+    description = models.TextField()
+
+    def __str__(self):
+        return f"{self.name} ({self.pdb_id})"
+./app/tasks.py
+import uuid
+from celery import shared_task
+from django.core.mail import send_mail
+from .models import Job, Target, KnownDrug
+from .utils import convert_pdb_to_pdbqt, convert_smiles_to_pdbqt, parse_vina_output, calculate_tanimoto_similarity
+
+@shared_task
+def perform_docking_task(target_id, job_id_str, email):
+    try:
+        job_id = uuid.UUID(job_id_str)
+        job = Job.objects.get(job_id=job_id)
+        job.status = 'RUNNING'
+        job.save()
+        
+        target = Target.objects.get(id=target_id)
+        # Actual docking implementation here
+        
+        job.status = 'COMPLETED'
+        job.results = "Affinity scores: [-7.2, -6.8, -6.5]"
+        job.save()
+        
+        send_mail(
+            "Docking Completed",
+            f"Job {job_id} completed successfully",
+            "noreply@example.com",
+            [email],
+            fail_silently=True,
+        )
+    except Exception as e:
+        job.status = 'FAILED'
+        job.results = str(e)
+        job.save()
+        send_mail(
+            "Docking Failed",
+            f"Job {job_id} failed: {str(e)}",
+            "noreply@example.com",
+            [email],
+            fail_silently=True,
+        )
+
+@shared_task
+def perform_similarity_analysis_task(smiles, threshold, job_id, email):
+    try:
+        job = Job.objects.get(job_id=job_id)
+        job.status = 'RUNNING'
+        job.save()
+        
+        results = calculate_tanimoto_similarity(smiles, KnownDrug.objects.all())
+        filtered = [r for r in results if r['score'] >= threshold]
+        
+        job.results = str(filtered)
+        job.status = 'COMPLETED'
+        job.save()
+        
+        send_mail(
+            "Similarity Analysis Completed",
+            f"Job {job_id} completed with {len(filtered)} matches",
+            "noreply@example.com",
+            [email],
+            fail_silently=True,
+        )
+    except Exception as e:
+        job.status = 'FAILED'
+        job.results = str(e)
+        job.save()
+        send_mail(
+            "Similarity Analysis Failed",
+            f"Job {job_id} failed: {str(e)}",
+            "noreply@example.com",
+            [email],
+            fail_silently=True,
+        )
+./app/utils.py
+import subprocess
+import logging
+from pathlib import Path
+from tempfile import NamedTemporaryFile
+from typing import List, Dict, Tuple, Optional
+import re
+
+# RDKit imports with version check
+try:
+    from rdkit import Chem, RDLogger
+    from rdkit.Chem import AllChem, DataStructs, rdMolDescriptors
+    RDLogger.DisableLog('rdApp.*')  # Disable RDKit warnings
+except ImportError:
+    raise RuntimeError("RDKit not installed. Install with: conda install -c conda-forge rdkit")
+
+# Configure logging
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
+# Constants
+VINA_RESULT_PATTERN = re.compile(r"REMARK VINA RESULT\s+([-\d.]+)")
+
+def run_pepsmi(sequence: str) -> str:
+    """Convert peptide sequence to SMILES using PepSMI with validation."""
+    if not isinstance(sequence, str) or not sequence.isupper():
+        raise ValueError("Invalid sequence format. Use uppercase amino acid letters")
+    
+    try:
+        result = subprocess.run(
+            ["pepsmi", sequence],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=30  # Add timeout
+        )
+        return result.stdout.strip()
+    except subprocess.CalledProcessError as e:
+        logger.error(f"PepSMI failed: {e.stderr}")
+        raise RuntimeError(f"PepSMI conversion error: {e.stderr}") from e
+    except FileNotFoundError:
+        raise RuntimeError("PepSMI not found. Install from: [repository_url]")
+
+def validate_smiles(smiles: str) -> Tuple[bool, Optional[str]]:
+    """Validate SMILES string with detailed error reporting."""
+    if not isinstance(smiles, str) or len(smiles) == 0:
+        return False, "Empty or invalid input"
+    
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return False, "Invalid SMILES syntax"
+    
+    try:
+        Chem.SanitizeMol(mol)
+        return True, None
+    except Exception as e:
+        return False, f"Sanitization error: {str(e)}"
+
+def validate_pdb_file(pdb_file: Path) -> Tuple[bool, Optional[str]]:
+    """Validate PDB file structure with efficient parsing."""
+    required_sections = {'ATOM', 'END'}
+    found_sections = set()
+    
+    try:
+        with pdb_file.open('r') as f:
+            for line in f:
+                record = line[:6].strip()
+                if record in required_sections:
+                    found_sections.add(record)
+                if found_sections == required_sections:
+                    break
+                    
+        if not required_sections.issubset(found_sections):
+            missing = required_sections - found_sections
+            return False, f"Missing required sections: {', '.join(missing)}"
+            
+        return True, None
+    except Exception as e:
+        logger.error(f"PDB validation failed: {str(e)}")
+        return False, f"File processing error: {str(e)}"
+
+def convert_pdb_to_pdbqt(input_pdb: Path, output_pdbqt: Path) -> Path:
+    """Convert PDB to PDBQT format with error handling."""
+    if not input_pdb.exists():
+        raise FileNotFoundError(f"Input PDB file not found: {input_pdb}")
+        
+    try:
+        subprocess.run(
+            ["prepare_receptor4.py", "-r", str(input_pdb), "-o", str(output_pdbqt)],
+            check=True,
+            timeout=120,
+            capture_output=True
+        )
+        return output_pdbqt
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("PDBQT conversion timed out after 120 seconds")
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Conversion failed: {e.stderr.decode()}")
+        raise
+
+def convert_smiles_to_pdbqt(smiles: str, output_pdbqt: Path) -> Path:
+    """Convert SMILES to 3D structure and PDBQT format."""
+    valid, msg = validate_smiles(smiles)
+    if not valid:
+        raise ValueError(f"Invalid SMILES: {msg}")
+    
+    try:
+        mol = Chem.MolFromSmiles(smiles)
+        mol = Chem.AddHs(mol)
+        
+        # Generate conformation with ETKDGv3
+        AllChem.EmbedMolecule(mol, AllChem.ETKDGv3())
+        AllChem.MMFFOptimizeMolecule(mol)  # More accurate than UFF
+        
+        with NamedTemporaryFile(suffix=".pdb", delete=True) as tmp:
+            Chem.MolToPDBFile(mol, tmp.name)
+            subprocess.run(
+                ["prepare_ligand4.py", "-l", tmp.name, "-o", str(output_pdbqt)],
+                check=True,
+                timeout=60,
+                capture_output=True
+            )
+        return output_pdbqt
+    except Exception as e:
+        logger.error(f"SMILES to PDBQT conversion failed: {str(e)}")
+        raise
+
+def parse_vina_output(output_file: Path) -> List[float]:
+    """Parse AutoDock Vina results with regex pattern matching."""
+    scores = []
+    try:
+        with output_file.open('r') as f:
+            for line in f:
+                match = VINA_RESULT_PATTERN.search(line)
+                if match:
+                    scores.append(float(match.group(1)))
+        return sorted(scores)
+    except Exception as e:
+        logger.error(f"Vina output parsing failed: {str(e)}")
+        raise
+
+def calculate_tanimoto_similarity(input_smiles: str, known_drugs: List[Dict]) -> List[Dict]:
+    """Calculate Tanimoto similarity scores with batch processing."""
+    valid, msg = validate_smiles(input_smiles)
+    if not valid:
+        raise ValueError(f"Invalid input SMILES: {msg}")
+    
+    input_mol = Chem.MolFromSmiles(input_smiles)
+    input_fp = rdMolDescriptors.GetMorganFingerprintAsBitVect(input_mol, 2)
+    
+    results = []
+    for drug in known_drugs:
+        try:
+            drug_mol = Chem.MolFromSmiles(drug['smiles'])
+            if drug_mol is None:
+                logger.warning(f"Invalid drug SMILES: {drug['name']}")
+                continue
+                
+            drug_fp = rdMolDescriptors.GetMorganFingerprintAsBitVect(drug_mol, 2)
+            similarity = DataStructs.TanimotoSimilarity(input_fp, drug_fp)
+            
+            results.append({
+                'name': drug['name'],
+                'score': round(similarity, 3),
+                'smiles': drug['smiles'],
+                'description': drug.get('description', '')
+            })
+        except Exception as e:
+            logger.error(f"Error processing {drug['name']}: {str(e)}")
+    
+    return sorted(results, key=lambda x: x['score'], reverse=True)
+
+def run_alphafold_convert(input_sequence: str, output_dir: Path) -> Path:
+    """Run AlphaFold structure prediction with resource monitoring."""
+    output_dir.mkdir(exist_ok=True, parents=True)
+    
+    try:
+        # Validate input sequence
+        if not re.match("^[ACDEFGHIKLMNPQRSTVWY]+$", input_sequence):
+            raise ValueError("Invalid amino acid sequence")
+            
+        with NamedTemporaryFile(dir=output_dir, suffix=".fasta", delete=False) as tmp:
+            tmp.write(f">input_sequence\n{input_sequence}".encode())
+            fasta_path = Path(tmp.name)
+            
+        cmd = [
+            "singularity", "run", "--nv",
+            "--bind", f"{output_dir}:/data",
+            "/path/to/alphafold.sif",
+            "--fasta_paths=/data/input.fasta",
+            "--output_dir=/data/output",
+            "--max_template_date=2025-03-10",
+            "--model_preset=monomer",
+            "--db_preset=reduced_dbs"
+        ]
+        
+        result = subprocess.run(
+            cmd,
+            check=True,
+            timeout=3600,  # 1 hour timeout
+            capture_output=True,
+            text=True
+        )
+        
+        # Find best ranked PDB file
+        pdb_files = list(output_dir.glob("output/ranked_*.pdb"))
+        if not pdb_files:
+            raise FileNotFoundError("No AlphaFold output files generated")
+            
+        return max(pdb_files, key=lambda f: f.stat().st_size)
+        
+    except subprocess.TimeoutExpired:
+        logger.error("AlphaFold prediction timed out after 1 hour")
+        raise
+    except Exception as e:
+        logger.error(f"AlphaFold failed: {str(e)}")
+        raise
+./inSilicoScreening/__init__.py
+"""
+Package for inSilicoScreening.
+"""
+from .celery import app as celery_app
+
+__all__ = ('celery_app',)
+./inSilicoScreening/admin.py
+from django.contrib import admin
+from app.models import Target, Compound, KnownDrug
+
+admin.site.register(Target)
+admin.site.register(Compound)
+admin.site.register(KnownDrug)./inSilicoScreening/celery.py
+import os
+from celery import Celery
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'inSilicoScreening.settings')
+app = Celery('inSilicoScreening')
+app.config_from_object('django.conf:settings', namespace='CELERY')
+app.autodiscover_tasks()
+./inSilicoScreening/settings.py
+import os
+from pathlib import Path
+import posixpath
+from decouple import config
+from sqlalchemy import false
+from celery.schedules import crontab
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Secret Key (Ensure to keep this secret in production)
+SECRET_KEY = '4f0a8e4e-007c-4584-8913-2967f102f503'
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    'django_bootstrap5',
+    'app',  # Main application
+]
+
+# settings.py
+ALLOWED_HOSTS = [
+    '10.2.0.32',   # Server IP
+    '127.0.0.1',    # Localhost IPv4
+    'localhost',     # Localhost alias
+    'zenome-school-2' # Server hostname (if applicable)
+]
+
+
+MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+]
+
+ROOT_URLCONF = 'inSilicoScreening.urls'
+
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [BASE_DIR / 'app' / 'templates'],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+                'django.template.context_processors.static',
+            ],
+        },
+    },
+]
+
+WSGI_APPLICATION = 'inSilicoScreening.wsgi.application'
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
+}
+
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+    },
+]
+
+# Internationalization
+LANGUAGE_CODE = 'en-us'
+# Static and Media Files
+STATIC_URL = '/static/'
+STATICFILES_DIRS = [BASE_DIR / 'app' / 'static']
+STATIC_ROOT = posixpath.join(*(BASE_DIR.parts + ('static',)))
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CSRF_TRUSTED_ORIGINS = [
+    'http://127.0.0.1:8000',
+    'http://127.0.0.1:80',
+    'http://10.2.0.32:8000',
+    'http://10.2.0.32:8001',
+    'http://127.0.0.1:8001',
+]
+
+# Redirect URLs after login/logout
+LOGIN_REDIRECT_URL = 'home'
+LOGOUT_REDIRECT_URL = 'home'
+
+# settings.py
+FILE_UPLOAD_MAX_MEMORY_SIZE = 26214400  # 25MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 26214400   # 25MB
+
+
+# Security Settings
+SECURE_HSTS_SECONDS = 3600  # Start with 1 hour, then increase
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
+SECURE_SSL_REDIRECT = False  # Redirect HTTP to HTTPS
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
+DEBUG = True  # Never run with DEBUG=True in production!
+
+./inSilicoScreening/urls.py
+from django.urls import path
+from app import views
+from django.contrib.auth import views as auth_views
+from django.views.generic import TemplateView
+
+urlpatterns = [
+    path('', views.home, name='home'),
+    path('about/', TemplateView.as_view(
+        template_name='app/about.html'
+    ), name='about'),
+    path('contact/', TemplateView.as_view(
+        template_name='app/contact.html'
+    ), name='contact'),
+    path('login/', auth_views.LoginView.as_view(
+            template_name='app/login.html',
+            redirect_authenticated_user=True
+        ), name='login'),
+    path('logout/', auth_views.LogoutView.as_view(
+            template_name='app/logout.html'
+        ), name='logout'),
+    path('register/', views.register, name='register'),
+    #other html files urls
+]

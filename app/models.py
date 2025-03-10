@@ -9,7 +9,7 @@ class Job(models.Model):
         ('COMPLETED', 'Completed'),
         ('FAILED', 'Failed'),
     ]
-
+    
     job_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDING')
@@ -19,12 +19,12 @@ class Job(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Job {self.job_id} by {self.user.username}"
+        return f"Job {self.job_id}"
 
 class KnownDrug(models.Model):
     name = models.CharField(max_length=255)
     smiles = models.CharField(max_length=255)
-    description = models.TextField(null=True, blank=True)
+    description = models.TextField()
 
     def __str__(self):
         return self.name
@@ -32,7 +32,7 @@ class KnownDrug(models.Model):
 class Target(models.Model):
     name = models.CharField(max_length=255)
     pdb_id = models.CharField(max_length=10)
-    description = models.TextField(null=True, blank=True)
+    description = models.TextField()
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.pdb_id})"

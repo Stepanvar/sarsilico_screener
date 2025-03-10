@@ -1,50 +1,65 @@
-{% extends 'app/layout.html' %}
-
+{% extends "app/layout.html" %}
 {% load static %}
 
+{% block title %}SMILES Input{% endblock %}
+
 {% block content %}
-<h2>Submit Small Molecule</h2>
-<form method="post" enctype="multipart/form-data" class="mb-3">
-	{% csrf_token %}
-	{{ form.non_field_errors }}
-	<div class="form-group">
-		{{ form.smiles.label_tag }}
-		{{ form.smiles }}
-		{% if form.smiles.errors %}
-		<div class="text-danger">{{ form.smiles.errors }}</div>
-		{% endif %}
-	</div>
-	<div class="form-group">
-		{{ form.smiles_file.label_tag }}
-		{{ form.smiles_file }}
-		{% if form.smiles_file.errors %}
-		<div class="text-danger">{{ form.smiles_file.errors }}</div>
-		{% endif %}
-	</div>
-	<button type="submit" class="btn btn-success">Submit</button>
-</form>
-<hr>
-<h3>Draw Molecule</h3>
-<div id="marvin-sketch"></div>
-<script>
-	let sketcherInstance;
+<div class="card shadow">
+    <div class="card-header bg-primary text-white">
+        <h3 class="mb-0">SMILES Input</h3>
+    </div>
+    <div class="card-body">
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            
+            <div class="mb-4">
+                <label class="form-label">Draw Molecular Structure</label>
+                <div id="marvin-sketch" style="height: 300px; border: 2px dashed #0d6efd;"></div>
+            </div>
 
-	MarvinJSUtil.getEditor("marvin-sketch").then(function (instance) {
-		sketcherInstance = instance;
-		sketcherInstance.on("structureChange", function () {
-			sketcherInstance.exportStructure("smiles").then(function (smiles) {
-				document.getElementById("id_smiles").value = smiles;
-			}).catch(function (error) {
-				console.error("Error exporting structure:", error);
-			});
-		});
-	}).catch(function (error) {
-		console.error("Error initializing Marvin JS editor:", error);
-	});
+            <div class="mb-3">
+                <label for="id_smiles" class="form-label">SMILES String</label>
+                <input type="text" name="smiles" id="id_smiles" 
+                       class="form-control" placeholder="Enter SMILES notation">
+            </div>
 
-</script>
+            <div class="mb-4">
+                <label class="form-label">Or Upload SMILES File</label>
+                <input type="file" class="form-control" name="smiles_file" 
+                       accept=".smi,.smiles,.txt">
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-lg w-100">
+                Submit for Analysis
+            </button>
+        </form>
+    </div>
+</div>
 {% endblock %}
-{% block scripts %}
+
+{% block extra_js %}
 <script src="{% static 'app/scripts/marvinjslauncher.js' %}"></script>
-<script src="{% static 'app/scripts/promise-1.0.0.min.js' %}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const marvinConfig = {
+            height: '400px',
+            width: '100%',
+            smiles: '',
+            settings: {
+                molView: {
+                    showAtomColors: true,
+                    showSelectionRegions: true
+                }
+            }
+        };
+        
+        MarvinJSUtil.getEditor('marvin-sketch', marvinConfig).then(editor => {
+            editor.on('molchange', () => {
+                editor.exportStructure('smiles').then(smiles => {
+                    document.getElementById('id_smiles').value = smiles;
+                });
+            });
+        });
+    });
+</script>
 {% endblock %}

@@ -1,35 +1,57 @@
-{% extends 'app/layout.html' %}
+{% extends "app/layout.html" %}
+{% load static %}
+
+{% block title %}PDB Upload{% endblock %}
 
 {% block content %}
-<h2>Upload PDB File</h2>
-<form id="pdb-upload-form" method="post" enctype="multipart/form-data">
-	{% csrf_token %}
-	{{ form.as_p }}
-	<div id="drop-zone" class="form-control" style="border: 2px dashed #ccc; padding: 20px; text-align: center;">
-		Drag and drop files here
-	</div>
-	<button type="submit" class="btn btn-success">Upload</button>
-</form>
+<div class="card shadow">
+    <div class="card-header bg-primary text-white">
+        <h3 class="mb-0">PDB File Upload</h3>
+    </div>
+    <div class="card-body">
+        <form method="post" enctype="multipart/form-data" id="pdb-upload-form">
+            {% csrf_token %}
+            
+            <div class="mb-4">
+                <div id="drop-zone" 
+                     class="border-2 border-dashed rounded-3 p-5 text-center bg-light">
+                    <p class="text-muted mb-3">Drag and drop PDB files here</p>
+                    <input type="file" class="form-control" name="pdb_file" 
+                           id="pdb-file-input" accept=".pdb">
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-lg w-100">
+                Upload and Analyze
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
 <script>
-	const dropZone = document.getElementById('drop-zone');
-	const fileInput = document.getElementById('id_pdb_file');
+document.addEventListener('DOMContentLoaded', function() {
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('pdb-file-input');
 
-	dropZone.addEventListener('dragover', (e) => {
-		e.preventDefault();
-		dropZone.style.borderColor = '#333';
-	});
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('border-primary');
+    });
 
-	dropZone.addEventListener('dragleave', () => {
-		dropZone.style.borderColor = '#ccc';
-	});
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('border-primary');
+    });
 
-	dropZone.addEventListener('drop', (e) => {
-		e.preventDefault();
-		dropZone.style.borderColor = '#ccc';
-		const files = e.dataTransfer.files;
-		if (files.length > 0) {
-			fileInput.files = files;
-		}
-	});
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('border-primary');
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+        }
+    });
+});
 </script>
 {% endblock %}

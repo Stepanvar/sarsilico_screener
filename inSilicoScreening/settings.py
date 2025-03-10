@@ -1,27 +1,14 @@
 import os
 from pathlib import Path
 import posixpath
-from celery.schedules import crontab
 from decouple import config
-# Base Directory
+from sqlalchemy import false
+from celery.schedules import crontab
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Secret Key (Ensure to keep this secret in production)
 SECRET_KEY = '4f0a8e4e-007c-4584-8913-2967f102f503'
-
-# Debug Mode
-DEBUG = config('DJANGO_DEBUG', default=True, cast=bool)
-
-# Allowed Hosts
-ALLOWED_HOSTS = []
-
-# Security Settings
-SESSION_COOKIE_SECURE = False
-CSRF_COOKIE_SECURE = False
-SECURE_BROWSER_XSS_FILTER = False
-SECURE_CONTENT_TYPE_NOSNIFF = False
-
-# Installed Apps
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -33,7 +20,15 @@ INSTALLED_APPS = [
     'app',  # Main application
 ]
 
-# Middleware
+# settings.py
+ALLOWED_HOSTS = [
+    '10.2.0.32',   # Server IP
+    '127.0.0.1',    # Localhost IPv4
+    'localhost',     # Localhost alias
+    'zenome-school-2' # Server hostname (if applicable)
+]
+
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -44,10 +39,8 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-# URL Configuration
 ROOT_URLCONF = 'inSilicoScreening.urls'
 
-# Templates Configuration
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -65,10 +58,8 @@ TEMPLATES = [
     },
 ]
 
-# WSGI Application
 WSGI_APPLICATION = 'inSilicoScreening.wsgi.application'
 
-# Database Configuration
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -76,7 +67,6 @@ DATABASES = {
     }
 }
 
-# Password Validation
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -100,13 +90,11 @@ STATICFILES_DIRS = [BASE_DIR / 'app' / 'static']
 STATIC_ROOT = posixpath.join(*(BASE_DIR.parts + ('static',)))
 
 MEDIA_URL = '/media/'
-MEDIA_ROOT = posixpath.join(*(BASE_DIR.parts + ('media',)))
+MEDIA_ROOT = BASE_DIR / 'media'
 
-# Default Primary Key Field Type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Celery Configuration
-CELERY_BROKER_URL = 'redis://localhost:6379/0'  # Using Redis as the broker
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
 CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
@@ -115,17 +103,41 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:8000',
     'http://127.0.0.1:80',
     'http://10.2.0.32:8000',
+    'http://10.2.0.32:8001',
+    'http://127.0.0.1:8001',
 ]
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Redirect URLs after login/logout
 LOGIN_REDIRECT_URL = 'home'
 LOGOUT_REDIRECT_URL = 'home'
 
-# Email backend configuration (optional)
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.example.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'your-email@example.com'
-EMAIL_HOST_PASSWORD = 'your-email-password'
+# settings.py
+FILE_UPLOAD_MAX_MEMORY_SIZE = 26214400  # 25MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 26214400   # 25MB
+
+
+# Security Settings
+SECURE_HSTS_SECONDS = 3600  # Start with 1 hour, then increase
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
+SECURE_SSL_REDIRECT = False  # Redirect HTTP to HTTPS
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
+DEBUG = True  # Never run with DEBUG=True in production!
+
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# settings.py
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'DEBUG',
+    },
+}

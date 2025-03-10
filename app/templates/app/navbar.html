@@ -1,18 +1,67 @@
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-	<a class="navbar-brand" href="{% url 'home' %}">SARSilico Screener</a>
-	<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-		<span class="navbar-toggler-icon"></span>
-	</button>
-	<div class="collapse navbar-collapse" id="navbarNav">
-		<ul class="navbar-nav">
-			<li class="nav-item"><a class="nav-link" href="{% url 'smiles_input' %}">Input SMILES</a></li>
-			<li class="nav-item"><a class="nav-link" href="{% url 'pdb_upload' %}">Upload PDB</a></li>
-			<li class="nav-item"><a class="nav-link" href="{% url 'target_selection' %}">Select Target</a></li>
-			<li class="nav-item"><a class="nav-link" href="{% url 'similarity_analysis' %}">Similarity Check</a></li>
-			<li class="nav-item"><a class="nav-link" href="{% url 'docking' %}">Docking</a></li>
-            <li class="nav-item"><a class="nav-link" href="{% url 'sequence_conversion' %}">Sequence Conversion</a></li>
-		</ul>
-		<!-- Include loginpartial -->
-		{% include 'app/loginpartial.html' %}
-	</div>
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="{% url 'home' %}">
+            SARSilico Screener
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="mainNav">
+            <ul class="navbar-nav me-auto">
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" 
+                       data-bs-toggle="dropdown" aria-expanded="false">
+                        Submit
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-dark">
+                        <li><a class="dropdown-item" href="{% url 'smiles_input' %}">Small Molecules</a></li>
+                        <li><a class="dropdown-item" href="{% url 'pdb_upload' %}">Peptide/Antibody</a></li>
+                    </ul>
+                </li>
+                
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle active" href="#" role="button" 
+                       data-bs-toggle="dropdown" aria-expanded="false">
+                        Analysis
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-dark">
+                        <li><a class="dropdown-item" href="{% url 'similarity_analysis' %}">Similarity Check</a></li>
+                        <li><a class="dropdown-item" href="{% url 'docking' %}">Molecular Docking</a></li>
+                        <li><a class="dropdown-item" href="{% url 'sequence_conversion' %}">Sequence Conversion</a></li>
+                    </ul>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'target_selection' %}">Target Selection</a>
+                </li>
+                
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" 
+                       data-bs-toggle="dropdown" aria-expanded="false">
+                        Results
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-dark">
+                        <li><a class="dropdown-item" href="{% url 'job_status' %}">Job Status</a></li>
+                        <li><a class="dropdown-item" href="{% url 'example_results' %}">Examples</a></li>
+                    </ul>
+                </li>
+            </ul>
+            
+            <ul class="navbar-nav ms-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'tutorial' %}">
+                        <i class="bi bi-journal-text"></i> Tutorial
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'citation' %}">
+                        <i class="bi bi-book"></i> Citations
+                    </a>
+                </li>
+                {% include 'app/loginpartial.html' %}
+            </ul>
+        </div>
+    </div>
 </nav>
+

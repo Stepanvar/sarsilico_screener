@@ -40,3 +40,23 @@ input[type="checkbox"].input-validation-error {
 .validation-summary-valid {
     display: none;
 }
+
+/* Match reference site styling */
+.navbar-brand { 
+    font-weight: 600;
+    letter-spacing: 0.8px;
+}
+
+.dropdown-menu-dark {
+    background-color: #1a237e;
+}
+
+.nav-link {
+    font-size: 0.95rem;
+    padding: 0.8rem 1.2rem;
+    transition: all 0.3s ease;
+}
+
+.nav-link:hover {
+    background-color: rgba(255,255,255,0.1);
+}
