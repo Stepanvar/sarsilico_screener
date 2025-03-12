@@ -1,0 +1,72 @@
+{% extends "app/base.html" %}
+
+{% block content %}
+<div class="current-target">
+    Selected Target: <strong>{{ request.session.selected_target }}</strong>
+  </div>
+  
+<div class="input-container">
+    <iframe id="marvin-sketch" 
+            src="{% static 'editorws.html' %}"
+            style="overflow: hidden; width: 600px; height: 500px; border: 1px solid #ddd;"></iframe>
+
+            <form id="sketch-form" method="post" action="{% url 'validate_small_molecule' %}">
+                {% csrf_token %}
+                <!-- Add CSRF and progress tracking -->
+                <input type="hidden" name="pdb_id" value="{{ request.session.selected_target }}">
+                
+                <!-- Enhanced MarvinJS init -->
+                <script>
+                MarvinJSUtil.getPackage("marvin-sketch").then(marvin => {
+                    const config = {
+                        license: "non-commercial",
+                        disableDepict: true,
+                        webservices: "{% static 'webservices.js' %}" 
+                    };
+                    marvin.sketcherInstance = new marvin.Sketch(config);
+                });
+                </script>
+            </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    let marvinInstance;
+    
+    // Initialize sketcher
+    MarvinJSUtil.getPackage("marvin-sketch").then(marvin => {
+        marvinInstance = marvin;
+        return marvin.sketcherInstance.exportAs('mrv');
+    }).catch(error => {
+        console.error('MarvinJS initialization failed:', error);
+    });
+
+    // Handle form submission
+    document.getElementById('sketch-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        try {
+            const mrvData = await marvinInstance.sketcherInstance.exportAs('mrv');
+            document.getElementById('mrv-data').value = mrvData;
+            
+            // Convert MRV to SMILES
+            const response = await fetch('/api/convert/mrv-to-smiles', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({mrv: mrvData})
+            });
+            
+            const result = await response.json();
+            if(result.valid) {
+                document.getElementById('sketch-form').submit();
+            } else {
+                alert('Invalid structure: ' + result.error);
+            }
+        } catch (error) {
+            console.error('Submission error:', error);
+            alert('Error processing structure');
+        }
+    });
+});
+</script>
+{% endblock %}

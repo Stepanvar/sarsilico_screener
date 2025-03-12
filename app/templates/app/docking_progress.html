@@ -1,0 +1,55 @@
+{% extends "app/base.html" %}
+
+{% block content %}
+<div class="docking-progress">
+    <h2>Docking Simulation Progress</h2>
+    
+    <div class="progress-container">
+        <div class="stage" id="preprocessing">
+            <h4>1. Structure Preparation</h4>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: 0%"></div>
+            </div>
+        </div>
+        
+        <div class="stage" id="grid-config">
+            <h4>2. Grid Configuration</h4>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: 0%"></div>
+            </div>
+        </div>
+        
+        <div class="stage" id="vina-run">
+            <h4>3. AutoDock Vina Execution</h4>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: 0%"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="console-output" id="vina-console"></div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const jobId = new URLSearchParams(window.location.search).get('job_id');
+    const eventSource = new EventSource(`/api/docking/${jobId}/status`);
+    
+    eventSource.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+        
+        // Update progress bars
+        document.querySelectorAll(`.stage`).forEach(stage => {
+            if(stage.id === data.stage) {
+                stage.querySelector('.progress-fill').style.width = `${data.progress}%`;
+            }
+        });
+        
+        // Update console
+        const consoleDiv = document.getElementById('vina-console');
+        consoleDiv.innerHTML += `<div class="log-entry">${data.message}</div>`;
+        consoleDiv.scrollTop = consoleDiv.scrollHeight;
+    };
+});
+</script>
+{% endblock %}

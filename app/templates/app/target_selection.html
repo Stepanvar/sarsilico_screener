@@ -1,20 +1,31 @@
-{% extends 'app/layout.html' %}
+{% extends "app/base.html" %}
 
 {% block content %}
-<h2>Select SARS-CoV-2 Target Protein</h2>
-<form method="post" class="mb-3">
-	{% csrf_token %}
-	{{ form.non_field_errors }}
-	<div class="form-group">
-		{{ form.target.label_tag }}
-		{{ form.target }}
+<div class="target-grid">
+	{% for category, pdbs in TARGETS.items %}
+	<div class="target-card">
+	  <h3>{{ category }}</h3>
+	  <div class="pdb-list">
+		{% for pdb in pdbs %}
+		<form method="post" action="{% url 'set_target' %}">
+		  {% csrf_token %}
+		  <input type="hidden" name="pdb_id" value="{{ pdb }}">
+		  <button type="submit" class="pdb-option">
+			{{ pdb }}
+		  </button>
+		</form>
+		{% endfor %}
+	  </div>
 	</div>
-	<button type="submit" class="btn btn-primary">Start Docking</button>
-</form>
-<h5>Available Targets</h5>
-<ul>
-	{% for t in targets %}
-	<li>{{ t.name }} - {{ t.description }}</li>
 	{% endfor %}
-</ul>
+  </div>
+
+<script>
+document.querySelectorAll('.pdb-option').forEach(btn => {
+  btn.addEventListener('click', () => {
+    sessionStorage.setItem('selectedTarget', btn.dataset.pdb);
+    window.location.href = "{% url 'input' %}";
+  });
+});
+</script>
 {% endblock %}

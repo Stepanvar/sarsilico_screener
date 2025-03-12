@@ -1,353 +1,2449 @@
-./app/models.py
-from django.db import models
-from django.contrib.auth.models import User
-import uuid
+./app/templates/app/login.html
+{% extends 'app/base.html' %}
 
-class Job(models.Model):
+{% block content %}
+<h2>Login</h2>
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+<form method="post">
+	{% csrf_token %}
+	<div class="form-group">
+		<label for="username">Username:</label>
+		<input type="text" class="form-control" name="username" id="username" required>
+	</div>
+	<div class="form-group">
+		<label for="password">Password:</label>
+		<input type="password" class="form-control" name="password" id="password" required>
+	</div>
+	<button type="submit" class="btn btn-primary">Login</button>
+</form>
+{% endblock %}./app/templates/app/loginpartial.html
+<ul class="navbar-nav">
+    {% if user.is_authenticated %}
+    <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+            <i class="bi bi-person-circle"></i> {{ user.username }}
+        </a>
+        <ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item" href="#">Profile</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{% url 'logout' %}">Logout</a></li>
+        </ul>
+    </li>
+    {% else %}
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'login' %}">Login</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'register' %}">Register</a>
+    </li>
+    {% endif %}
+</ul>
+./app/templates/app/navbar.html
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="{% url 'index' %}">
+            
+        </a>
+        
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="mainNav">
+            <ul class="navbar-nav me-auto">
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        Start Screening
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="{% url 'small_molecule' %}">Small Molecules</a></li>
+                        <li><a class="dropdown-item" href="{% url 'biomol' %}">Peptides/Antibodies</a></li>
+                    </ul>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'target_selection' %}">Target Library</a>
+                </li>
+                {% comment %} <li class="nav-item">
+                    <a class="nav-link" href="{% url 'results_summary' %}">My Results</a>
+                </li> {% endcomment %}
+            </ul>
+            
+            <ul class="navbar-nav ms-auto">
+                {% if user.is_authenticated %}
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-person-circle"></i> {{ user.username }}
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="#">Profile</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{% url 'logout' %}">Logout</a></li>
+                    </ul>
+                </li>
+                {% else %}
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'login' %}">Login</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'register' %}">Register</a>
+                </li>
+                {% endif %}
+                        
+            </ul>
+        </div>
+    </div>
+</nav>
+./app/templates/app/register.html
+{% extends 'app/base.html' %}
+{% block title %}Register - SARS-CoV-2 Research Platform{% endblock %}
+
+{% block content %}
+<div class="mt-4">
+    <h2>Register</h2>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-primary">Register</button>
+    </form>
+</div>
+{% endblock %}./app/templates/app/target_selection.html
+{% extends "app/base.html" %}
+
+{% block content %}
+<div class="target-grid">
+	{% for category, pdbs in TARGETS.items %}
+	<div class="target-card">
+	  <h3>{{ category }}</h3>
+	  <div class="pdb-list">
+		{% for pdb in pdbs %}
+		<form method="post" action="{% url 'set_target' %}">
+		  {% csrf_token %}
+		  <input type="hidden" name="pdb_id" value="{{ pdb }}">
+		  <button type="submit" class="pdb-option">
+			{{ pdb }}
+		  </button>
+		</form>
+		{% endfor %}
+	  </div>
+	</div>
+	{% endfor %}
+  </div>
+
+<script>
+document.querySelectorAll('.pdb-option').forEach(btn => {
+  btn.addEventListener('click', () => {
+    sessionStorage.setItem('selectedTarget', btn.dataset.pdb);
+    window.location.href = "{% url 'compound_input' %}";
+  });
+});
+</script>
+{% endblock %}
+./app/templates/app/base.html
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SARSilico Screener - {% block title %}{% endblock %}</title>
+    <link href="{% static 'css/bootstrap.min.css' %}" rel="stylesheet">
+    <link href="{% static 'css/site.css' %}" rel="stylesheet">
+    <script src="{% static 'js/jquery-3.6.0.min.js' %}"></script>
+    <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'js/promise-1.0.0.min.js' %}"></script>
+    <script src="{% static 'js/marvinjslauncher.js' %}"></script>
+    <script src="{% static 'js/ngl.js' %}"></script>
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    {% include 'app/navbar.html' %}
+    
+    <main class="container-fluid mt-4">
+        {% block content %}{% endblock %}
+    </main>
+
+    <div id="global-alerts"></div>
+    {% block post_content %}{% endblock %}
+</body>
+</html>
+./app/templates/app/index.html
+{% extends "app/base.html" %}
+
+{% block content %}
+<div class="screening-interface">
+    <div class="hero-banner text-center py-5 bg-light">
+        <h1 class="display-4">SARS-CoV-2 In-Silico Screening</h1>
+        <p class="lead">Dual-input drug discovery platform with integrated validation</p>
+    </div>
+
+    <div class="row mt-5">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-bezier"></i> Small Molecules
+                    </h5>
+                    <ul class="feature-list">
+                        <li>Draw or upload chemical structures</li>
+                        <li>Real-time SMILES validation</li>
+                        <li>AutoDock Vina integration</li>
+                    </ul>
+                    <a href="{% url 'small_molecule' %}" class="btn btn-primary">
+                        Start Small Molecule Screening
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-dna"></i> Biomolecules
+                    </h5>
+                    <ul class="feature-list">
+                        <li>Peptide/antibody sequence input</li>
+                        <li>AlphaFold structure prediction</li>
+                        <li>CIF-to-PDB conversion</li>
+                    </ul>
+                    <a href="{% url 'biomol' %}" class="btn btn-primary">
+                        Start Biomolecule Screening
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="recent-targets mt-5">
+        <h4>Common SARS-CoV-2 Targets</h4>
+        <div class="target-grid">
+            {% for target in recent_targets %}
+            <a href="{% url 'target_detail' target.pdb_id %}" class="target-card">
+                <div class="pdb-id">{{ target.pdb_id }}</div>
+                <div class="target-name">{{ target.name }}</div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+./app/templates/app/compound_input/small_molecule.html
+{% extends "app/base.html" %}
+
+{% block content %}
+<div class="current-target">
+    Selected Target: <strong>{{ request.session.selected_target }}</strong>
+  </div>
+  
+<div class="input-container">
+    <iframe id="marvin-sketch" 
+            src="{% static 'editorws.html' %}"
+            style="overflow: hidden; width: 600px; height: 500px; border: 1px solid #ddd;"></iframe>
+
+            <form id="sketch-form" method="post" action="{% url 'validate_small_molecule' %}">
+                {% csrf_token %}
+                <!-- Add CSRF and progress tracking -->
+                <input type="hidden" name="pdb_id" value="{{ request.session.selected_target }}">
+                
+                <!-- Enhanced MarvinJS init -->
+                <script>
+                MarvinJSUtil.getPackage("marvin-sketch").then(marvin => {
+                    const config = {
+                        license: "non-commercial",
+                        disableDepict: true,
+                        webservices: "{% static 'webservices.js' %}" 
+                    };
+                    marvin.sketcherInstance = new marvin.Sketch(config);
+                });
+                </script>
+            </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    let marvinInstance;
+    
+    // Initialize sketcher
+    MarvinJSUtil.getPackage("marvin-sketch").then(marvin => {
+        marvinInstance = marvin;
+        return marvin.sketcherInstance.exportAs('mrv');
+    }).catch(error => {
+        console.error('MarvinJS initialization failed:', error);
+    });
+
+    // Handle form submission
+    document.getElementById('sketch-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        try {
+            const mrvData = await marvinInstance.sketcherInstance.exportAs('mrv');
+            document.getElementById('mrv-data').value = mrvData;
+            
+            // Convert MRV to SMILES
+            const response = await fetch('/api/convert/mrv-to-smiles', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({mrv: mrvData})
+            });
+            
+            const result = await response.json();
+            if(result.valid) {
+                document.getElementById('sketch-form').submit();
+            } else {
+                alert('Invalid structure: ' + result.error);
+            }
+        } catch (error) {
+            console.error('Submission error:', error);
+            alert('Error processing structure');
+        }
+    });
+});
+</script>
+{% endblock %}
+./app/templates/app/compound_input/peptide.html
+{% extends "app/base.html" %}
+
+{% block content %}
+<div class="peptide-input">
+    <h2>Short Peptide Input</h2>
+    
+    <div class="input-group">
+        <textarea id="peptide-sequence" 
+                  placeholder="Enter amino acid sequence (e.g., ACGTY)"></textarea>
+        <div class="sequence-info">
+            <span id="seq-length">Length: 0 residues</span>
+            <span id="seq-validation"></span>
+        </div>
+    </div>
+    
+    <div class="actions">
+        <button id="btn-convert" class="btn-primary">Convert to SMILES</button>
+        <div id="pepsmi-result" class="hidden">
+            <code class="smiles-output"></code>
+            <button class="btn-confirm">Use This SMILES</button>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const textarea = document.getElementById('peptide-sequence');
+    const convertBtn = document.getElementById('btn-convert');
+    
+    textarea.addEventListener('input', () => {
+        document.getElementById('seq-length').textContent = 
+            `Length: ${textarea.value.length} residues`;
+    });
+    
+    convertBtn.addEventListener('click', async () => {
+        const sequence = textarea.value;
+        const response = await fetch('/api/convert/pepsmi', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({sequence})
+        });
+        
+        const result = await response.json();
+        const resultDiv = document.getElementById('pepsmi-result');
+        
+        if(result.success) {
+            resultDiv.querySelector('.smiles-output').textContent = result.smiles;
+            resultDiv.classList.remove('hidden');
+        } else {
+            document.getElementById('seq-validation').textContent = result.error;
+        }
+    });
+});
+</script>
+<script>
+    const validateSequence = (seq) => {
+        const regex = /^[ACDEFGHIKLMNPQRSTVWYUO]*$/i;
+        return regex.test(seq);
+    };
+    
+    textarea.addEventListener('input', () => {
+        const valid = validateSequence(textarea.value);
+        document.getElementById('seq-validation').textContent = 
+            valid ? '' : 'Invalid amino acid characters detected';
+    });
+    </script>
+{% endblock %}
+./app/templates/app/compound_input/biomolecule.html
+{% extends "app/base.html" %}
+
+{% block content %}
+<div class="biomolecule-flow">
+  <!-- Sequence Input -->
+  <textarea id="sequence-input" 
+            placeholder="Enter protein/nucleotide sequence"></textarea>
+  <div id="sequence-validation"></div>
+
+  <!-- Conversion Pipeline -->
+  <div class="conversion-steps">
+    <div class="step" id="alphafold-step">
+      <h4>1. Structure Prediction</h4>
+      <div class="progress-bar"></div>
+    </div>
+    
+    <div class="step" id="cif-conversion-step">
+      <h4>2. CIF to PDB Conversion</h4>
+      <div class="progress-bar"></div>
+    </div>
+  </div>
+
+  <button id="run-conversion">Start Processing</button>
+</div>
+
+<script>
+document.getElementById('run-conversion').addEventListener('click', async () => {
+  const sequence = document.getElementById('sequence-input').value;
+  
+  // Start AlphaFold prediction
+  const response = await fetch('/api/run_alphafold', {
+    method: 'POST',
+    body: JSON.stringify({sequence}) 
+  });
+  
+  // Update UI with conversion progress
+  updateConversionStatus(response.job_id);
+});
+</script>
+<script>
+    function updateConversionStatus(jobId) {
+        const eventSource = new EventSource(`/api/conversion/${jobId}/status`);
+        
+        eventSource.addEventListener('error', () => {
+            alert('AlphaFold prediction failed - please try shorter sequence');
+            eventSource.close();
+        });
+    }
+</script>
+{% endblock %}
+./app/templates/app/validation_feedback.html
+{% extends "app/base.html" %}
+
+{% block content %}
+<div class="validation-results">
+    <h3>Validation Results</h3>
+    
+    <div class="validation-card {% if valid %}valid{% else %}invalid{% endif %}">
+        <div class="status-icon">
+            {% if valid %}&#10004;{% else %}&#10008;{% endif %}
+        </div>
+        
+        <div class="validation-details">
+            <h4>{% if valid %}Valid Structure{% else %}Validation Failed{% endif %}</h4>
+            
+            {% if messages %}
+            <ul class="validation-messages">
+                {% for msg in messages %}
+                <li>{{ msg }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="actions">
+        {% if valid %}
+        <button class="btn-continue" onclick="window.history.back()">Continue</button>
+        {% else %}
+        <button class="btn-fix" onclick="window.history.back()">Modify Input</button>
+        {% endif %}
+    </div>
+</div>
+<script>
+    if(!document.cookie.includes('pipeline=validation')) {
+        window.location.href = "{% url 'target_selection' %}";
+    }
+</script>
+{% endblock %}
+./app/templates/app/similarity_check.html
+{% extends "app/base.html" %}
+
+{% block content %}
+<div class="similarity-results">
+  {% if similar_drugs %}
+  <div class="warning-card">
+    <h3>⚠️ Similar Drugs Found</h3>
+    <ul class="drug-list">
+      {% for drug in similar_drugs %}
+      <li>
+        <strong>{{ drug.name }}</strong> (Tanimoto: {{ drug.score }})
+        <a href="{{ drug.coviDrug_url }}" target="_blank">View in CoviDrug</a>
+      </li>
+      {% endfor %}
+    </ul>
+    
+    <div class="actions">
+      <button class="btn-secondary" onclick="history.back()">Modify Compound</button>
+      <button class="btn-warning" id="force-continue">Continue Anyway</button>
+    </div>
+  </div>
+  {% else %}
+  <div class="novel-card">
+    <h3>✅ Novel Structure Detected</h3>
+    <p>Proceeding to docking simulation...</p>
+    <div class="loading-spinner"></div>
+  </div>
+  {% endif %}
+</div>
+<script>
+    document.getElementById('force-continue').addEventListener('click', () => {
+        fetch("{% url 'override_similarity' %}", {method: 'POST'})
+         .then(() => window.location.href = "{% url 'docking_progress' %}");
+    });
+</script>
+{% endblock %}
+./app/templates/app/docking_progress.html
+{% extends "app/base.html" %}
+
+{% block content %}
+<div class="docking-progress">
+    <h2>Docking Simulation Progress</h2>
+    
+    <div class="progress-container">
+        <div class="stage" id="preprocessing">
+            <h4>1. Structure Preparation</h4>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: 0%"></div>
+            </div>
+        </div>
+        
+        <div class="stage" id="grid-config">
+            <h4>2. Grid Configuration</h4>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: 0%"></div>
+            </div>
+        </div>
+        
+        <div class="stage" id="vina-run">
+            <h4>3. AutoDock Vina Execution</h4>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: 0%"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="console-output" id="vina-console"></div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const jobId = new URLSearchParams(window.location.search).get('job_id');
+    const eventSource = new EventSource(`/api/docking/${jobId}/status`);
+    
+    eventSource.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+        
+        // Update progress bars
+        document.querySelectorAll(`.stage`).forEach(stage => {
+            if(stage.id === data.stage) {
+                stage.querySelector('.progress-fill').style.width = `${data.progress}%`;
+            }
+        });
+        
+        // Update console
+        const consoleDiv = document.getElementById('vina-console');
+        consoleDiv.innerHTML += `<div class="log-entry">${data.message}</div>`;
+        consoleDiv.scrollTop = consoleDiv.scrollHeight;
+    };
+});
+</script>
+{% endblock %}
+./app/templates/app/results/summary.html
+{% extends "app/base.html" %}
+
+{% block content %}
+<div class="similarity-alert">
+    {% if similarity.match %}
+<div class="similarity-alert">
+    <h5>TTD Match: {{ similarity.name }}</h5>
+    <table class="similarity-table">
+        <tr><th>Tanimoto Score</th><td>{{ similarity.score }}</td></tr>
+        <tr><th>CoviDrug Entry</th><td><a href="{{ similarity.covidrug_url }}" target="_blank">View details</a></td></tr>
+        <tr><th>TTD ID</th><td>{{ similarity.ttd_id }}</td></tr>
+    </table>
+</div>
+{% endif %}
+</div>
+
+<div class="results-summary">
+    <h2>Screening Results</h2>
+    
+    <div class="score-card">
+        <div class="main-score">
+            <span class="value">{{ score }}</span>
+            <span class="label">Vina Affinity Score</span>
+        </div>
+        
+        <div class="score-details">
+            <div class="detail">
+                <span class="label">Target</span>
+                <span class="value">{{ target_pdb }}</span>
+            </div>
+            <div class="detail">
+                <span class="label">Ligand</span>
+                <span class="value">{{ ligand_name }}</span>
+            </div>
+            <div class="detail">
+                <span class="label">Processing Time</span>
+                <span class="value">{{ duration }}s</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="actions">
+        <a href="{% url 'visualization' job_id %}" class="btn btn-primary">
+            View 3D Structure
+        </a>
+        <a href="{{ report_url }}" class="btn btn-secondary">
+            Download Full Report
+        </a>
+    </div>
+</div>
+{% endblock %}
+./app/templates/app/results/visualization.html
+{% extends "app/base.html" %}
+
+{% block content %}
+<div class="visualization-container">
+    <div class="viewer-controls">
+        <div class="view-modes">
+            <button class="btn-view" data-representation="cartoon">Protein</button>
+            <button class="btn-view" data-representation="surface">Surface</button>
+            <button class="btn-view" data-representation="ball+stick">Ligand</button>
+        </div>
+        
+        <div class="download-options">
+            <button class="btn-download" data-format="pdb">Download PDB</button>
+            <button class="btn-download" data-format="sdf">Download SDF</button>
+        </div>
+    </div>
+    
+    <div id="ngl-viewer" style="width: 100%; height: 600px;"></div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const stage = new NGL.Stage("ngl-viewer");
+    
+    // Load target structure
+    stage.loadFile("{% static target_pdb %}", { defaultRepresentation: true })
+        .then(component => {
+            component.addRepresentation('cartoon', { color: 'residueindex' });
+        });
+    
+    // Load ligand structure
+    stage.loadFile("{{ ligand_url }}")
+        .then(component => {
+            component.addRepresentation('ball+stick');
+            component.autoView();
+        });
+
+    // visualization.html
+    const visualizationPresets = {
+        protein: {
+            representations: ['cartoon'],
+            colorScheme: 'residueindex'
+        },
+        ligand: {
+            representations: ['ball+stick'],
+            colorScheme: 'element'
+        },
+        surface: {
+            representations: ['surface'],
+            colorScheme: 'hydrophobicity'
+        }
+    };
+
+    // Usage in view mode switching
+    document.querySelectorAll('.btn-view').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const preset = visualizationPresets[btn.dataset.representation];
+            stage.removeAllComponents();
+            stage.loadFile("{{ complex_url }}", {
+                representations: preset.representations,
+                colorScheme: preset.colorScheme
+            });
+        });
+    });
+});
+</script>
+{% endblock %}
+./readme.html
+./app/__init__.py
+"""
+Package for the application.
+"""
+./app/forms.py
+# app/forms.py
+from django import forms
+from django.core.validators import MaxLengthValidator
+from django.conf import settings
+from rdkit import Chem
+import re
+
+class SMILESForm(forms.Form):
+    """
+    Validates SMILES/drawn structures (section 2a)
+    Supports both direct input and MarvinJS sketches
+    """
+    smiles = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'smiles-input',
+            'placeholder': 'Enter SMILES notation'
+        }),
+        help_text="Enter valid SMILES or draw structure below"
+    )
+    marvinjs = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(),
+        help_text="MarvinJS sketch data"
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        smiles = cleaned_data.get('smiles')
+        marvinjs = cleaned_data.get('marvinjs')
+
+        if not (smiles or marvinjs):
+            raise forms.ValidationError(
+                "Please enter a SMILES string or draw a structure",
+                code='missing_input'
+            )
+
+        # Prioritize MarvinJS data if both provided
+        if marvinjs:
+            try:
+                mol = Chem.MolFromMrvBlock(marvinjs)
+                if not mol:
+                    raise forms.ValidationError(
+                        "Invalid chemical structure in MarvinJS sketch",
+                        code='invalid_mrv'
+                    )
+                Chem.SanitizeMol(mol)
+                cleaned_data['smiles'] = Chem.MolToSmiles(mol)
+            except Exception as e:
+                raise forms.ValidationError(
+                    f"MarvinJS conversion failed: {str(e)}",
+                    code='mrv_conversion_error'
+                )
+        else:
+            mol = Chem.MolFromSmiles(smiles)
+            if not mol:
+                raise forms.ValidationError(
+                    "Invalid SMILES format",
+                    code='invalid_smiles'
+                )
+            try:
+                Chem.SanitizeMol(mol)
+            except ValueError as e:
+                raise forms.ValidationError(
+                    f"Chemical validation failed: {str(e)}",
+                    code='sanitization_error'
+                )
+
+        return cleaned_data
+
+class PDBUploadForm(forms.Form):
+    """
+    Validates PDB files (section 2 requirements)
+    Checks format, resolution, and structural validity
+    """
+    pdb_file = forms.FileField(
+        widget=forms.ClearableFileInput(attrs={
+            'accept': '.pdb',
+            'class': 'pdb-upload'
+        }),
+        help_text="Upload PDB file (max resolution 3.0Å)"
+    )
+
+    def clean_pdb_file(self):
+        pdb_file = self.cleaned_data['pdb_file']
+        
+        # File extension check
+        if not pdb_file.name.lower().endswith('.pdb'):
+            raise forms.ValidationError(
+                "Invalid file format - only .pdb files accepted",
+                code='invalid_format'
+            )
+
+        # Read and validate content
+        try:
+            content = pdb_file.read().decode()
+            mol = Chem.MolFromPDBBlock(content)
+            
+            if not mol or mol.GetNumAtoms() == 0:
+                raise forms.ValidationError(
+                    "Invalid PDB structure - missing atoms",
+                    code='invalid_structure'
+                )
+
+            # Extract resolution from REMARK records
+            resolution = None
+            for line in content.split('\n'):
+                if line.startswith('REMARK   2 RESOLUTION.'):
+                    try:
+                        resolution = float(line.split()[-1])
+                        if resolution > settings.MAX_PDB_RESOLUTION:
+                            raise forms.ValidationError(
+                                f"Resolution {resolution}Å exceeds maximum allowed {settings.MAX_PDB_RESOLUTION}Å",
+                                code='resolution_exceeded'
+                            )
+                    except (IndexError, ValueError):
+                        pass
+
+            if resolution is None:
+                raise forms.ValidationError(
+                    "Missing resolution in PDB remarks",
+                    code='missing_resolution'
+                )
+
+        except UnicodeDecodeError:
+            raise forms.ValidationError(
+                "Invalid file content - not a text PDB file",
+                code='invalid_encoding'
+            )
+
+        return pdb_file
+
+class SequenceForm(forms.Form):
+    """
+    Validates peptide/biomolecule sequences (section 2b/c)
+    Handles both amino acid and nucleotide inputs
+    """
+    SEQUENCE_TYPE_CHOICES = [
+        ('peptide', 'Short Peptide (≤20 residues)'),
+        ('biomolecule', 'Large Biomolecule (≥50 residues)'),
+    ]
+
+    sequence = forms.CharField(
+        widget=forms.Textarea(attrs={
+            'rows': 4,
+            'placeholder': 'Enter amino acid or nucleotide sequence'
+        }),
+        validators=[MaxLengthValidator(2000)],
+        help_text="Enter sequence in single-letter code"
+    )
+    sequence_type = forms.ChoiceField(
+        choices=SEQUENCE_TYPE_CHOICES,
+        widget=forms.RadioSelect,
+        initial='peptide'
+    )
+
+    def clean_sequence(self):
+        sequence = self.cleaned_data['sequence'].upper().replace(' ', '')
+        seq_type = self.data.get('sequence_type', 'peptide')
+
+        # Validate characters
+        if seq_type == 'peptide':
+            if not re.match(r'^[ACDEFGHIKLMNPQRSTVWY]+$', sequence):
+                invalid = set(sequence) - set("ACDEFGHIKLMNPQRSTVWY")
+                raise forms.ValidationError(
+                    f"Invalid amino acids: {', '.join(invalid)}",
+                    code='invalid_amino_acids'
+                )
+            if len(sequence) > 20:
+                raise forms.ValidationError(
+                    "Peptide sequence exceeds 20 residue limit",
+                    code='peptide_too_long'
+                )
+        else:  # Biomolecule
+            if not re.match(r'^[ACDEFGHIKLMNPQRSTVWYacdefghiklmnpqrstvwy]+$', sequence) and \
+               not re.match(r'^[ATCGUatcgu]+$', sequence):
+                raise forms.ValidationError(
+                    "Invalid sequence - must be amino acids or nucleotides",
+                    code='invalid_biomolecule'
+                )
+            if len(sequence) < 50:
+                raise forms.ValidationError(
+                    "Biomolecule sequence must be ≥50 residues",
+                    code='biomolecule_too_short'
+                )
+
+        return sequence
+./app/models.py
+# app/models.py
+from uuid import uuid4
+from django.db import models
+from django.core.validators import MaxValueValidator
+from django.forms import ValidationError
+from django.utils import timezone
+from django.db.models import JSONField
+class Target(models.Model):
+    """
+    Implements Section 1: Predefined protein targets with PDB validation
+    Stores validated PDB structures for SARS-CoV-2 proteins
+    """
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)  
+    PROTEIN_TYPE_CHOICES = [
+        ('SPIKE', 'Spike Protein'),
+        ('PROTEASE', 'Protease'),
+        ('POLYMERASE', 'Polymerase'),
+    ]
+
+    name = models.CharField(
+        max_length=100,
+        unique=True,
+        help_text="Unique identifier for the target protein"
+    )
+    pdb_file = models.FileField(
+        upload_to='targets/',
+        help_text="Validated PDB structure file"
+    )
+    protein_type = models.CharField(
+        max_length=20,
+        choices=PROTEIN_TYPE_CHOICES,
+        help_text="Type of viral protein"
+    )
+    resolution = models.FloatField(
+        validators=[MaxValueValidator(3.0)],
+        help_text="X-ray resolution in Ångströms (≤3.0Å required)"
+    )
+    validation_status = models.BooleanField(
+        default=False,
+        help_text="PDB validation outcome from section 2 checks"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Predefined Target"
+
+    def __str__(self):
+        return f"{self.name} ({self.protein_type})"
+
+class Compound(models.Model):
+    """
+    Implements Section 2: Compound input handling and validation
+    Stores all input types with conversion results and validation status
+    """
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)  
+    COMPOUND_TYPE_CHOICES = [
+        ('SMILES', 'SMILES (Drawn/Entered)'),
+        ('PDB', 'PDB File'),
+        ('PEPTIDE', 'Short Peptide (2b)'),
+        ('BIOMOLECULE', 'Large Biomolecule (2c)'),
+    ]
+    type = models.CharField(
+        max_length=20,
+        choices=COMPOUND_TYPE_CHOICES,
+        help_text="Input type as per section 2 requirements"
+    )
+    input_data = models.TextField(
+        help_text="Raw input (SMILES, sequence, or PDB content)"
+    )
+    validation_status = models.BooleanField(
+        default=False,
+        help_text="Validation outcome from section 2 checks"
+    )
+    validation_errors = JSONField(
+        blank=True,
+        help_text="Validation error messages",
+        default=dict  # Add default empty dict
+    )
+
+    converted_smiles = models.TextField(
+        null=True,
+        blank=True,
+        help_text="Converted SMILES for docking (peptides/small molecules)"
+    )
+    converted_pdb = models.FileField(
+        upload_to='converted_structures/',
+        null=True,
+        blank=True,
+        help_text="Generated PDB from AlphaFold (biomolecules)"
+    )
+    alphafold_job_id = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        help_text="Tracking ID for AlphaFold predictions"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['type', 'validation_status']),
+        ]
+
+    def __str__(self):
+        return f"{self.type} ({self.created_at.date()})"
+
+class ScreeningJob(models.Model):
+    """
+    Implements Section 5: Workflow tracking with status transitions
+    Maintains complete screening pipeline state
+    """
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)  
     STATUS_CHOICES = [
         ('PENDING', 'Pending'),
-        ('RUNNING', 'Running'),
+        ('VALIDATING', 'Validating Input'),
+        ('SIM_CHECK', 'Similarity Check (Section 3)'),
+        ('DOCKING', 'Docking Execution (Section 4)'),
         ('COMPLETED', 'Completed'),
         ('FAILED', 'Failed'),
     ]
-    
-    job_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDING')
-    results = models.TextField(null=True, blank=True)
-    results_binding_pose_path = models.CharField(max_length=500, null=True, blank=True)
+    target = models.ForeignKey(
+        Target,
+        on_delete=models.CASCADE,
+        related_name='jobs',
+        help_text="Selected target protein from section 1"
+    )
+    compound = models.ForeignKey(
+        Compound,
+        on_delete=models.CASCADE,
+        related_name='jobs',
+        help_text="Input compound with validated/converted data"
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='PENDING',
+        help_text="Current workflow state per section 5 sequence diagram"
+    )
+    similarity_data = JSONField(
+        blank=True,
+        help_text="TTD/CoviDrug analysis results",
+        default=dict  # Proper default for empty JSON
+    )
+    docking_score = models.FloatField(
+        null=True,
+        blank=True,
+        help_text="Best AutoDock Vina affinity score (kcal/mol)"
+    )
+    ligand_pdbqt = models.FileField(
+        upload_to='docking_files/ligands/',
+        null=True,
+        blank=True,
+        help_text="Prepared ligand file for Vina docking"
+    )
+    complex_structure = models.FileField(
+        upload_to='results/complexes/',
+        null=True,
+        blank=True,
+        help_text="Final protein-ligand complex structure"
+    )
+    visualization_config = JSONField(
+        null=True,
+        blank=True,
+        help_text="NGL.js visualization parameters for section 5 output"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    completed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp of job completion/failure"
+    )
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status']),
+            models.Index(fields=['docking_score']),
+        ]
 
     def __str__(self):
-        return f"Job {self.job_id}"
+        return f"Job-{self.id} ({self.status})"
 
-class KnownDrug(models.Model):
-    name = models.CharField(max_length=255)
-    smiles = models.CharField(max_length=255)
-    description = models.TextField()
+    def clean(self):
+        """Enforce workflow rules from insilico.txt requirements"""
+        # Section 1 resolution validation
+        if self.target.resolution > 3.0:
+            raise ValidationError("Target resolution exceeds 3.0Å limit")
+        
+        # Section 5 completion requirements
+        if self.status == 'COMPLETED' and not self.docking_score:
+            raise ValidationError("Completed jobs must have docking scores")
+        
+        # Section 2 validation pre-requisite
+        if self.status != 'PENDING' and not self.compound.validation_status:
+            raise ValidationError("Compound must be validated before processing")
 
-    def __str__(self):
-        return self.name
-
-class Target(models.Model):
-    name = models.CharField(max_length=255)
-    pdb_id = models.CharField(max_length=10)
-    description = models.TextField()
-
-    def __str__(self):
-        return f"{self.name} ({self.pdb_id})"
+    def save(self, *args, **kwargs):
+        """Automatically handle completion timestamps"""
+        if self.status in ['COMPLETED', 'FAILED'] and not self.completed_at:
+            self.completed_at = timezone.now()
+        super().save(*args, **kwargs)
 ./app/tasks.py
+# app/tasks.py
 import uuid
 from celery import shared_task
-from django.core.mail import send_mail
-from .models import Job, Target, KnownDrug
-from .utils import convert_pdb_to_pdbqt, convert_smiles_to_pdbqt, parse_vina_output, calculate_tanimoto_similarity
-
-@shared_task
-def perform_docking_task(target_id, job_id_str, email):
-    try:
-        job_id = uuid.UUID(job_id_str)
-        job = Job.objects.get(job_id=job_id)
-        job.status = 'RUNNING'
-        job.save()
-        
-        target = Target.objects.get(id=target_id)
-        # Actual docking implementation here
-        
-        job.status = 'COMPLETED'
-        job.results = "Affinity scores: [-7.2, -6.8, -6.5]"
-        job.save()
-        
-        send_mail(
-            "Docking Completed",
-            f"Job {job_id} completed successfully",
-            "noreply@example.com",
-            [email],
-            fail_silently=True,
-        )
-    except Exception as e:
-        job.status = 'FAILED'
-        job.results = str(e)
-        job.save()
-        send_mail(
-            "Docking Failed",
-            f"Job {job_id} failed: {str(e)}",
-            "noreply@example.com",
-            [email],
-            fail_silently=True,
-        )
-
-@shared_task
-def perform_similarity_analysis_task(smiles, threshold, job_id, email):
-    try:
-        job = Job.objects.get(job_id=job_id)
-        job.status = 'RUNNING'
-        job.save()
-        
-        results = calculate_tanimoto_similarity(smiles, KnownDrug.objects.all())
-        filtered = [r for r in results if r['score'] >= threshold]
-        
-        job.results = str(filtered)
-        job.status = 'COMPLETED'
-        job.save()
-        
-        send_mail(
-            "Similarity Analysis Completed",
-            f"Job {job_id} completed with {len(filtered)} matches",
-            "noreply@example.com",
-            [email],
-            fail_silently=True,
-        )
-    except Exception as e:
-        job.status = 'FAILED'
-        job.results = str(e)
-        job.save()
-        send_mail(
-            "Similarity Analysis Failed",
-            f"Job {job_id} failed: {str(e)}",
-            "noreply@example.com",
-            [email],
-            fail_silently=True,
-        )
-./app/utils.py
-import subprocess
+from django.core.files.base import ContentFile
+from jsonschema import ValidationError
+from regex import T
+from .models import ScreeningJob, Compound
+from .services.conversions import (
+    ConversionEngine,
+    ValidationTools,
+)
+from .services.docking import DockingEngine, DockingResultsParser
+from .services.similarity_checker import SimilarityChecker
 import logging
-from pathlib import Path
-from tempfile import NamedTemporaryFile
-from typing import List, Dict, Tuple, Optional
-import re
+import subprocess
+import json
+from django.db import transaction
 
-# RDKit imports with version check
-try:
-    from rdkit import Chem, RDLogger
-    from rdkit.Chem import AllChem, DataStructs, rdMolDescriptors
-    RDLogger.DisableLog('rdApp.*')  # Disable RDKit warnings
-except ImportError:
-    raise RuntimeError("RDKit not installed. Install with: conda install -c conda-forge rdkit")
-
-# Configure logging
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
 
-# Constants
-VINA_RESULT_PATTERN = re.compile(r"REMARK VINA RESULT\s+([-\d.]+)")
-
-def run_pepsmi(sequence: str) -> str:
-    """Convert peptide sequence to SMILES using PepSMI with validation."""
-    if not isinstance(sequence, str) or not sequence.isupper():
-        raise ValueError("Invalid sequence format. Use uppercase amino acid letters")
-    
+# app/tasks.py
+@shared_task(bind=True, autoretry_for=(Exception,), retry_kwargs={'max_retries': 3})
+def validate_input_task(self, compound_id: str) -> dict:
+    """
+    Async input validation (section 2)
+    Args:
+        compound_id: UUID string of Compound instance
+    """
     try:
-        result = subprocess.run(
-            ["pepsmi", sequence],
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=30  # Add timeout
-        )
-        return result.stdout.strip()
-    except subprocess.CalledProcessError as e:
-        logger.error(f"PepSMI failed: {e.stderr}")
-        raise RuntimeError(f"PepSMI conversion error: {e.stderr}") from e
-    except FileNotFoundError:
-        raise RuntimeError("PepSMI not found. Install from: [repository_url]")
-
-def validate_smiles(smiles: str) -> Tuple[bool, Optional[str]]:
-    """Validate SMILES string with detailed error reporting."""
-    if not isinstance(smiles, str) or len(smiles) == 0:
-        return False, "Empty or invalid input"
-    
-    mol = Chem.MolFromSmiles(smiles)
-    if mol is None:
-        return False, "Invalid SMILES syntax"
-    
-    try:
-        Chem.SanitizeMol(mol)
-        return True, None
-    except Exception as e:
-        return False, f"Sanitization error: {str(e)}"
-
-def validate_pdb_file(pdb_file: Path) -> Tuple[bool, Optional[str]]:
-    """Validate PDB file structure with efficient parsing."""
-    required_sections = {'ATOM', 'END'}
-    found_sections = set()
-    
-    try:
-        with pdb_file.open('r') as f:
-            for line in f:
-                record = line[:6].strip()
-                if record in required_sections:
-                    found_sections.add(record)
-                if found_sections == required_sections:
-                    break
+        compound = Compound.objects.get(id=compound_id)
+        converter = ConversionEngine()
+        result = {}
+        isValid = True
+        with transaction.atomic():
+            if compound.type == 'small_molecule':
+                if compound.input_data.startswith('MRV'):
+                    result = converter.marvin_to_smiles(compound.input_data)
+                else:
+                    isValid = ValidationTools.validate_smiles(compound.input_data)
+                    if isValid is False:
+                        raise ValidationError("Compound is not smiles")
                     
-        if not required_sections.issubset(found_sections):
-            missing = required_sections - found_sections
-            return False, f"Missing required sections: {', '.join(missing)}"
-            
-        return True, None
-    except Exception as e:
-        logger.error(f"PDB validation failed: {str(e)}")
-        return False, f"File processing error: {str(e)}"
-
-def convert_pdb_to_pdbqt(input_pdb: Path, output_pdbqt: Path) -> Path:
-    """Convert PDB to PDBQT format with error handling."""
-    if not input_pdb.exists():
-        raise FileNotFoundError(f"Input PDB file not found: {input_pdb}")
-        
-    try:
-        subprocess.run(
-            ["prepare_receptor4.py", "-r", str(input_pdb), "-o", str(output_pdbqt)],
-            check=True,
-            timeout=120,
-            capture_output=True
-        )
-        return output_pdbqt
-    except subprocess.TimeoutExpired:
-        raise RuntimeError("PDBQT conversion timed out after 120 seconds")
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Conversion failed: {e.stderr.decode()}")
-        raise
-
-def convert_smiles_to_pdbqt(smiles: str, output_pdbqt: Path) -> Path:
-    """Convert SMILES to 3D structure and PDBQT format."""
-    valid, msg = validate_smiles(smiles)
-    if not valid:
-        raise ValueError(f"Invalid SMILES: {msg}")
-    
-    try:
-        mol = Chem.MolFromSmiles(smiles)
-        mol = Chem.AddHs(mol)
-        
-        # Generate conformation with ETKDGv3
-        AllChem.EmbedMolecule(mol, AllChem.ETKDGv3())
-        AllChem.MMFFOptimizeMolecule(mol)  # More accurate than UFF
-        
-        with NamedTemporaryFile(suffix=".pdb", delete=True) as tmp:
-            Chem.MolToPDBFile(mol, tmp.name)
-            subprocess.run(
-                ["prepare_ligand4.py", "-l", tmp.name, "-o", str(output_pdbqt)],
-                check=True,
-                timeout=60,
-                capture_output=True
-            )
-        return output_pdbqt
-    except Exception as e:
-        logger.error(f"SMILES to PDBQT conversion failed: {str(e)}")
-        raise
-
-def parse_vina_output(output_file: Path) -> List[float]:
-    """Parse AutoDock Vina results with regex pattern matching."""
-    scores = []
-    try:
-        with output_file.open('r') as f:
-            for line in f:
-                match = VINA_RESULT_PATTERN.search(line)
-                if match:
-                    scores.append(float(match.group(1)))
-        return sorted(scores)
-    except Exception as e:
-        logger.error(f"Vina output parsing failed: {str(e)}")
-        raise
-
-def calculate_tanimoto_similarity(input_smiles: str, known_drugs: List[Dict]) -> List[Dict]:
-    """Calculate Tanimoto similarity scores with batch processing."""
-    valid, msg = validate_smiles(input_smiles)
-    if not valid:
-        raise ValueError(f"Invalid input SMILES: {msg}")
-    
-    input_mol = Chem.MolFromSmiles(input_smiles)
-    input_fp = rdMolDescriptors.GetMorganFingerprintAsBitVect(input_mol, 2)
-    
-    results = []
-    for drug in known_drugs:
-        try:
-            drug_mol = Chem.MolFromSmiles(drug['smiles'])
-            if drug_mol is None:
-                logger.warning(f"Invalid drug SMILES: {drug['name']}")
-                continue
+            elif compound.type == 'peptide':
+                result = converter.peptide_to_smiles(compound.input_data)
                 
-            drug_fp = rdMolDescriptors.GetMorganFingerprintAsBitVect(drug_mol, 2)
-            similarity = DataStructs.TanimotoSimilarity(input_fp, drug_fp)
-            
-            results.append({
-                'name': drug['name'],
-                'score': round(similarity, 3),
-                'smiles': drug['smiles'],
-                'description': drug.get('description', '')
-            })
-        except Exception as e:
-            logger.error(f"Error processing {drug['name']}: {str(e)}")
-    
-    return sorted(results, key=lambda x: x['score'], reverse=True)
+            elif compound.type == 'biomolecule':
+                result = handle_alphafold_task(str(compound.id))
+                return result  # Async chain
 
-def run_alphafold_convert(input_sequence: str, output_dir: Path) -> Path:
-    """Run AlphaFold structure prediction with resource monitoring."""
-    output_dir.mkdir(exist_ok=True, parents=True)
-    
+            if result['error'] is None:
+                compound.validation_status = False
+                compound.validation_errors = result
+            else:
+                compound.validation_status = True
+                if compound.type in ['small_molecule', 'peptide']:
+                    compound.converted_smiles = result.get('smiles', '')
+                
+            compound.save()
+
+            if compound.validation_status:
+                job = ScreeningJob.objects.get(compound=compound)
+                similarity_check_task.delay(int(job.id))
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Validation failed: {str(e)}")
+        compound.validation_errors = {'error': str(e)}
+        compound.save()
+        raise self.retry(exc=e)
+
+
+@shared_task(bind=True)
+def similarity_check_task(self, job_id: int) -> dict:
+    """
+    Drug repurposing workflow (section 3)
+    Args:
+        job_id: ScreeningJob ID
+    """
+    job = ScreeningJob.objects.get(id=job_id)
     try:
-        # Validate input sequence
-        if not re.match("^[ACDEFGHIKLMNPQRSTVWY]+$", input_sequence):
-            raise ValueError("Invalid amino acid sequence")
-            
-        with NamedTemporaryFile(dir=output_dir, suffix=".fasta", delete=False) as tmp:
-            tmp.write(f">input_sequence\n{input_sequence}".encode())
-            fasta_path = Path(tmp.name)
-            
-        cmd = [
-            "singularity", "run", "--nv",
-            "--bind", f"{output_dir}:/data",
-            "/path/to/alphafold.sif",
-            "--fasta_paths=/data/input.fasta",
-            "--output_dir=/data/output",
-            "--max_template_date=2025-03-10",
-            "--model_preset=monomer",
-            "--db_preset=reduced_dbs"
-        ]
+        job.status = 'SIM_CHECK'
+        job.save()
         
-        result = subprocess.run(
-            cmd,
-            check=True,
-            timeout=3600,  # 1 hour timeout
-            capture_output=True,
-            text=True
-        )
+        compound = job.compound
+        checker = SimilarityChecker()
         
-        # Find best ranked PDB file
-        pdb_files = list(output_dir.glob("output/ranked_*.pdb"))
-        if not pdb_files:
-            raise FileNotFoundError("No AlphaFold output files generated")
+        # Get SMILES based on compound type
+        smiles: str = compound.converted_smiles or ''
+        if not smiles:
+            raise ValueError("Invalid SMILES for similarity check")
+        result = checker.check_similarity(smiles)
+        
+        if 'error' not in result:
+            job.similarity_data = result
+            job.status = 'DOCKING' if not result['warning'] else 'SIM_CHECK'
+        
+        job.save()
+        return result
+        
+    except Exception as e:
+        logger.error(f"Similarity check failed: {str(e)}")
+        job.status = 'FAILED'
+        job.save()
+        raise
+
+@shared_task(bind=True)
+def run_docking_task(self, job_id: int) -> dict:
+    """
+    AutoDock execution (section 4)
+    Args:
+        job_id: ScreeningJob ID
+    """
+    job = ScreeningJob.objects.get(id=job_id)
+    try:
+        job.status = 'DOCKING'
+        job.save()
+        
+        # Prepare inputs
+        target_path = job.target.pdb_file.path
+        compound_data = {
+            'type': job.compound.type.lower(),
+            'data': job.compound.converted_smiles or job.compound.converted_pdb.path
+        }
+        
+        # Run docking
+        with DockingEngine(target_path, compound_data) as dock:
+            dock.prepare_receptor()
+            dock.prepare_ligand()
+            raw_results = dock.run_docking()
             
-        return max(pdb_files, key=lambda f: f.stat().st_size)
+            # Process results
+            parser = DockingResultsParser()
+            report = parser.generate_report(raw_results)
+            
+            # Save results
+            job.docking_score = raw_results['best_affinity']
+            job.ligand_pdbqt.save(
+                f'ligand_{job.id}.pdbqt',
+                ContentFile(raw_results['poses'][0]['pose'])
+            )
+            job.complex_structure.save(
+                f'complex_{job.id}.pdb',
+                ContentFile(report['visualization']['complex_pdb'])
+            )
+            job.visualization_config = report['visualization']
+            job.status = 'COMPLETED'
+            job.save()
+            
+            return report
+        
+    except Exception as e:
+        logger.error(f"Docking failed: {str(e)}")
+        job.status = 'FAILED'
+        job.save()
+        raise
+
+@shared_task(bind=True)
+def handle_alphafold_task(self, sequence: str) -> dict:
+    """
+    AlphaFold prediction (section 2c)
+    Args:
+        sequence: Biomolecule sequence
+    """
+    try:
+        converter = ConversionEngine()
+        result = converter.run_alphafold(sequence)
+        
+        if 'error' in result:
+            return result
+            
+        # Convert CIF to PDB
+        pdb_result = converter.cif_to_pdb(result['cif_data'])
+        return {
+            'pdb_data': pdb_result['pdb_data'],
+            'validation': pdb_result['validation']
+        }
         
     except subprocess.TimeoutExpired:
-        logger.error("AlphaFold prediction timed out after 1 hour")
-        raise
+        return {'error': 'AlphaFold processing timed out'}
     except Exception as e:
         logger.error(f"AlphaFold failed: {str(e)}")
-        raise
-./inSilicoScreening/__init__.py
+        return {'error': str(e)}
+./app/utils.py
+# app/utils.py
+from rdkit import Chem
+from rdkit.Chem import AllChem, rdMolDescriptors
+from MDAnalysis import Universe
+import logging
+import json
+from django.conf import settings
+
+logger = logging.getLogger(__name__)
+
+def generate_fingerprint(smiles: str) -> dict:
+    """Generate Morgan fingerprint with validation (Section 3)"""
+    try:
+        mol = Chem.MolFromSmiles(smiles)
+        if not mol:
+            return {'error': 'Invalid SMILES structure'}
+            
+        fp = rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, radius=2)
+        return {
+            'fingerprint': fp.ToBitString(),
+            'smiles': smiles,
+            'num_bits': fp.GetNumBits()
+        }
+    except Exception as e:
+        logger.error(f"Fingerprint generation failed: {str(e)}")
+        return {'error': str(e)}
+
+def validate_pdb_resolution(pdb_content: str) -> dict:
+    """PDB validation with resolution check (Section 2)"""
+    try:
+        # Check resolution from REMARK records
+        resolution = None
+        for line in pdb_content.split('\n'):
+            if line.startswith('REMARK   2 RESOLUTION.'):
+                resolution = float(line.split()[-1])
+                break
+        
+        validation_result = {
+            'valid': True,
+            'resolution': resolution,
+            'warnings': []
+        }
+        
+        # Check against maximum allowed resolution
+        if resolution and resolution > settings.MAX_PDB_RESOLUTION:
+            validation_result.update({
+                'valid': False,
+                'error': f"Resolution {resolution}Å exceeds limit"
+            })
+        
+        # Basic structure validation
+        mol = Chem.MolFromPDBBlock(pdb_content)
+        if not mol or mol.GetNumAtoms() == 0:
+            validation_result.update({
+                'valid': False,
+                'error': "Invalid PDB structure"
+            })
+            
+        return validation_result
+        
+    except Exception as e:
+        logger.error(f"PDB validation failed: {str(e)}")
+        return {'valid': False, 'error': str(e)}
+
+def prepare_visualization_data(results: dict) -> dict:
+    """Generate NGL.js configuration (Section 5)"""
+    try:
+        # Generate visualization script
+        script = f"""
+        var stage = new NGL.Stage("viewport");
+        Promise.all([
+            stage.loadFile("{results['target_pdb']}"),
+            stage.loadFile("{results['ligand_pdbqt']}")
+        ]).then(function(components) {{
+            components[0].addRepresentation("cartoon", {{ 
+                color: "residueindex" 
+            }});
+            components[1].addRepresentation("ball+stick");
+            stage.autoView();
+        }});
+        """
+        
+        return {
+            'ngl_script': script,
+            'target_pdb': results['target_pdb'],
+            'ligand_structure': results['ligand_pdbqt'],
+            'interaction_data': results.get('interaction_map', {})
+        }
+        
+    except Exception as e:
+        logger.error(f"Visualization prep failed: {str(e)}")
+        return {'error': str(e)}
+
+class ChemistryJSONEncoder(json.JSONEncoder):
+    """Custom JSON encoder for chemistry data types"""
+    def default(self, obj):
+        if isinstance(obj, Chem.Mol):
+            return Chem.MolToPDBBlock(obj)
+        return super().default(obj)
+./app/views.py
+# app/views.py
+import json
+import logging
+from django.views import View
+from django.shortcuts import render, redirect
+from django.http import JsonResponse, HttpResponseBadRequest
+from django.urls import reverse
+from django.db import transaction
+from django.core.exceptions import ValidationError
+
+from .models import Target, Compound, ScreeningJob
+from django.contrib.auth.forms import UserCreationForm
+from .forms import SMILESForm, PDBUploadForm, SequenceForm
+from .services.conversions import (
+    ConversionEngine, 
+    ValidationTools,
+)
+from .services.similarity_checker import SimilarityChecker
+from .services.docking import DockingEngine
+from .tasks import (
+    validate_input_task,
+    similarity_check_task,
+    run_docking_task,
+    handle_alphafold_task
+)
+
+logger = logging.getLogger(__name__)
+
+class IndexView(View):
+    template_name = 'app/index.html'
+    
+    def get(self, request):
+        return render(request, self.template_name)
+
+class TargetSelectionView(View):
+    template_name = 'app/target_selection.html'
+
+    def get(self, request):
+        targets = Target.objects.filter(validation_status='valid')
+        return render(request, self.template_name, {'targets': targets})
+
+    def post(self, request):
+        try:
+            target = Target.objects.get(pk=request.POST['target_id'])
+            request.session['selected_target'] = str(target.id)
+            return redirect('small_molecule_input')
+        except (KeyError, Target.DoesNotExist):
+            return render(request, self.template_name, {'error': 'Invalid target selection'})
+
+class SmallMoleculeInputView(View):
+    template_name = 'app/compound_input/small_molecule.html'
+    form_class = SMILESForm
+
+    def get(self, request):
+        if 'selected_target' not in request.session:
+            return redirect('index')
+        return render(request, self.template_name, {'form': self.form_class()})
+
+    def post(self, request):
+        form = self.form_class(request.POST)
+        if not form.is_valid():
+            return render(request, self.template_name, {'form': form})
+
+        try:
+            with transaction.atomic():
+                # Handle conversions
+                converter = ConversionEngine()
+                if form.cleaned_data.get('marvinjs'):
+                    result = converter.marvin_to_smiles(form.cleaned_data['marvinjs'])
+                    if 'error' in result:
+                        raise ValidationError(result['error'])
+                    smiles = result['smiles']
+                else:
+                    smiles = form.cleaned_data['smiles']
+
+                # Create compound and job
+                compound = Compound.objects.create(
+                    type='small_molecule',
+                    data=smiles,
+                    validation_result={'status': 'pending'}
+                )
+                job = ScreeningJob.objects.create(
+                    target_id=request.session['selected_target'],
+                    compound=compound,
+                    status='validation_pending'
+                )
+                compound_data = {
+                    'type': compound.type,
+                    'data': compound.input_data,
+                    'compound_id': compound.id
+                }
+                # Start validation task
+                validate_input_task.delay(compound_data)
+
+            return redirect('validation_feedback', job_id=job.id)
+
+        except Exception as e:
+            logger.error(f"Small molecule input error: {str(e)}")
+            return render(request, self.template_name, {'form': form, 'error': str(e)})
+
+class PeptideInputView(View):
+    template_name = 'app/compound_input/peptide.html'
+    form_class = SequenceForm
+
+    def get(self, request):
+        if 'selected_target' not in request.session:
+            return redirect('index')
+        return render(request, self.template_name, {'form': self.form_class()})
+
+    def post(self, request):
+        form = self.form_class(request.POST)
+        if not form.is_valid():
+            return render(request, self.template_name, {'form': form})
+
+        try:
+            converter = ConversionEngine()
+            result = converter.peptide_to_smiles(form.cleaned_data['sequence'])
+            
+            if 'error' in result:
+                raise ValidationError(result['error'])
+
+            with transaction.atomic():
+                compound = Compound.objects.create(
+                    type='peptide',
+                    data=form.cleaned_data['sequence'],
+                    converted_data=result['smiles'],
+                    validation_result={'status': 'pending'}
+                )
+                job = ScreeningJob.objects.create(
+                    target_id=request.session['selected_target'],
+                    compound=compound,
+                    status='validation_pending'
+                )
+                validate_input_task.delay(str(compound.id))
+
+            return redirect('validation_feedback', job_id=job.id)
+
+        except Exception as e:
+            logger.error(f"Peptide input error: {str(e)}")
+            return render(request, self.template_name, {'form': form, 'error': str(e)})
+
+class BiomoleculeInputView(View):
+    template_name = 'app/compound_input/biomolecule.html'
+    form_class = SequenceForm
+
+    def get(self, request):
+        if 'selected_target' not in request.session:
+            return redirect('index')
+        return render(request, self.template_name, {'form': self.form_class()})
+
+    def post(self, request):
+        form = self.form_class(request.POST)
+        if not form.is_valid():
+            return render(request, self.template_name, {'form': form})
+
+        try:
+            converter = ConversionEngine()
+            af_result = converter.run_alphafold(form.cleaned_data['sequence'])
+            
+            if 'error' in af_result:
+                raise ValidationError(af_result['error'])
+
+            with transaction.atomic():
+                compound = Compound.objects.create(
+                    type='biomolecule',
+                    data=form.cleaned_data['sequence'],
+                    converted_data=af_result['cif_data'],
+                    validation_result={'status': 'pending'}
+                )
+                job = ScreeningJob.objects.create(
+                    target_id=request.session['selected_target'],
+                    compound=compound,
+                    status='alphafold_processing'
+                )
+                handle_alphafold_task.delay(str(compound.id))
+
+            return redirect('docking_progress', job_id=job.id)
+
+        except Exception as e:
+            logger.error(f"Biomolecule input error: {str(e)}")
+            return render(request, self.template_name, {'form': form, 'error': str(e)})
+
+class ValidationFeedbackView(View):
+    template_name = 'app/validation_feedback.html'
+
+    def get(self, request, job_id):
+        try:
+            job = ScreeningJob.objects.get(id=job_id)
+            return render(request, self.template_name, {
+                'job': job,
+                'compound': job.compound,
+                'target': job.target
+            })
+        except ScreeningJob.DoesNotExist:
+            return render(request, self.template_name, {'error': 'Invalid job ID'})
+
+class SimilarityCheckView(View):
+    template_name = 'app/similarity_check.html'
+
+    def get(self, request, job_id):
+        try:
+            job = ScreeningJob.objects.get(id=job_id)
+            if job.status != 'similarity_check':
+                return redirect('validation_feedback', job_id=job_id)
+            
+            return render(request, self.template_name, {
+                'similarity_data': job.similarity_data,
+                'compound': job.compound
+            })
+        except ScreeningJob.DoesNotExist:
+            return render(request, self.template_name, {'error': 'Invalid job ID'})
+
+class DockingProgressView(View):
+    template_name = 'app/docking_progress.html'
+
+    def get(self, request, job_id):
+        try:
+            job = ScreeningJob.objects.get(id=job_id)
+            return render(request, self.template_name, {
+                'job': job,
+                'target': job.target
+            })
+        except ScreeningJob.DoesNotExist:
+            return render(request, self.template_name, {'error': 'Invalid job ID'})
+
+class ResultsVisualizationView(View):
+    template_name = 'app/results/visualization.html'
+
+    def get(self, request, job_id):
+        try:
+            job = ScreeningJob.objects.get(id=job_id)
+            return render(request, self.template_name, {
+                'job': job,
+                'visualization_config': self._prepare_ngl_config(job)
+            })
+        except ScreeningJob.DoesNotExist:
+            return render(request, self.template_name, {'error': 'Invalid job ID'})
+
+    def _prepare_ngl_config(self, job):
+        return {
+            'target_pdb': job.target.pdb_file.url,
+            'ligand_pdb': job.compound.converted_pdb.url,
+            'interactions': job.docking_results.get('interactions', [])
+        }
+
+class ResultsSummaryView(View):
+    template_name = 'app/results/summary.html'
+
+    def get(self, request, job_id):
+        try:
+            job = ScreeningJob.objects.get(id=job_id)
+            return render(request, self.template_name, {
+                'job': job,
+                'summary_data': self._prepare_summary(job)
+            })
+        except ScreeningJob.DoesNotExist:
+            return render(request, self.template_name, {'error': 'Invalid job ID'})
+
+    def _prepare_summary(self, job):
+        return {
+            'affinity_scores': job.docking_results.get('scores', []),
+            'similarity_warnings': job.similarity_data,
+            'validation_report': job.compound.validation_result
+        }
+
+# API Views
+class ValidatePDBAPI(View):
+    def post(self, request):
+        form = PDBUploadForm(request.POST, request.FILES)
+        if not form.is_valid():
+            return HttpResponseBadRequest(json.dumps(form.errors))
+        
+        try:
+            validator = ValidationTools()
+            result = validator.validate_pdb(request.FILES['pdb_file'].read().decode())
+            return JsonResponse(result)
+        except Exception as e:
+            logger.error(f"PDB validation error: {str(e)}")
+            return HttpResponseBadRequest(json.dumps({'error': str(e)}))
+
+class ConvertSequenceAPI(View):
+    def post(self, request):
+        data = json.loads(request.body)
+        sequence = data.get('sequence', '')
+        seq_type = data.get('type', 'peptide')
+        
+        try:
+            converter = ConversionEngine()
+            if seq_type == 'peptide':
+                result = converter.peptide_to_smiles(sequence)
+            else:
+                result = converter.run_alphafold(sequence)
+            
+            if 'error' in result:
+                return JsonResponse({'error': result['error']}, status=400)
+                
+            return JsonResponse(result)
+        except Exception as e:
+            logger.error(f"Sequence conversion error: {str(e)}")
+            return JsonResponse({'error': str(e)}, status=500)
+
+def register(request):
+    if request.method == 'POST':
+        form = UserCreationForm(request.POST)
+        if form.is_valid():
+            form.save()
+        else:
+            form = UserCreationForm()
+    return render(request, 'app/index.html')./app/services/similarity_checker.py
+# app/services/similarity_checker.py
+"""
+Drug repurposing checks implementing insilico.txt section 3 requirements
+Handles Morgan fingerprints, TTD API queries, and CoviDrug scraping
+"""
+
+import logging
+import requests
+from rdkit import Chem
+from rdkit.Chem import DataStructs, rdMolDescriptors
+from django.conf import settings
+from typing import Dict, Optional
+from bs4 import BeautifulSoup
+
+logger = logging.getLogger(__name__)
+
+class SimilarityChecker:
+    """
+    Drug repurposing validation system implementing:
+    - Morgan fingerprint generation (2048 bits)
+    - TTD API similarity search
+    - CoviDrug web scraping
+    """
+    
+    def __init__(self):
+        self.ttd_endpoint = settings.TTD_API_ENDPOINT
+        self.covidrug_base = settings.COVIDRUG_SCRAPE_URL
+        self.similarity_threshold = settings.SIMILARITY_THRESHOLD
+
+    def check_similarity(self, smiles: str) -> Dict:
+        """
+        Main workflow for drug repurposing check
+        Returns: Dict with similarity data and warnings
+        """
+        try:
+            # Generate validated fingerprint
+            fp = self.generate_fingerprint(smiles)
+            if not fp:
+                return {'error': 'Invalid compound for fingerprint generation'}
+
+            # Query Therapeutic Target Database
+            ttd_results = self.query_ttd(fp)
+            if 'error' in ttd_results:
+                return ttd_results
+
+            # Cross-reference with CoviDrug if threshold met
+            if ttd_results['max_similarity'] >= self.similarity_threshold:
+                covi_data = self.scrape_covdrug(ttd_results['best_match_id'])
+                return {
+                    **ttd_results,
+                    'covi_data': covi_data,
+                    'warning': True,
+                    'message': 'High similarity to known drug'
+                }
+            
+            return {
+                **ttd_results,
+                'warning': False,
+                'message': 'No significant similarity found'
+            }
+
+        except Exception as e:
+            logger.error(f"Similarity check failed for {smiles}: {str(e)}")
+            return {'error': str(e)}
+
+    def generate_fingerprint(self, smiles: str) -> Optional[DataStructs.cDataStructs.ExplicitBitVect]:
+        """
+        Generate 2048-bit Morgan fingerprint with radius 2
+        Returns: RDKit fingerprint vector or None
+        """
+        try:
+            mol = Chem.MolFromSmiles(smiles)
+            if not mol or not mol.GetNumAtoms():
+                return None
+                
+            return rdMolDescriptors.GetMorganFingerprintAsBitVect(
+                mol, 
+                radius=2,
+                nBits=2048,
+                useChirality=True
+            )
+        except Exception as e:
+            logger.error(f"Fingerprint generation failed for {smiles}: {str(e)}")
+            return None
+
+    def query_ttd(self, fp: DataStructs.cDataStructs.ExplicitBitVect) -> Dict:
+        """
+        Query Therapeutic Target Database API with fingerprint
+        Returns: Dict with similarity results or error
+        """
+        try:
+            # Convert to on-bit indices for efficient transfer
+            on_bits = fp.GetOnBits()
+            
+            response = requests.post(
+                f"{self.ttd_endpoint}/similarity",
+                json={
+                    'on_bits': list(on_bits),
+                    'n_bits': 2048,
+                    'threshold': self.similarity_threshold
+                },
+                headers={'Authorization': f"Bearer {settings.TTD_API_KEY}"},
+                timeout=15
+            )
+            response.raise_for_status()
+            data = response.json()
+            
+            # Validate API response structure
+            if not all(key in data for key in ['max_similarity', 'best_match']):
+                raise ValueError("Invalid TTD response structure")
+                
+            best_match = data['best_match']
+            if not best_match.get('drug_id'):
+                raise ValueError("Missing drug ID in best match")
+
+            return {
+                'max_similarity': data['max_similarity'],
+                'best_match_id': best_match['drug_id'],
+                'best_match_name': best_match.get('name', 'N/A'),
+                'mechanism_of_action': best_match.get('mechanism', 'Unknown')
+            }
+            
+        except requests.JSONDecodeError as e:
+            logger.error(f"TTD API JSON error: {str(e)}")
+            return {'error': 'Invalid API response format'}
+        except Exception as e:
+            logger.error(f"TTD API request failed: {str(e)}")
+            return {'error': f"TTD service error: {str(e)}"}
+
+    def scrape_covdrug(self, drug_id: str) -> Dict:
+        """
+        Scrape CoviDrug website for repurposing information
+        Returns: Dict with drug data or error
+        """
+        try:
+            response = requests.get(
+                f"{self.covidrug_base}/drug/{drug_id}",
+                headers={'User-Agent': 'Mozilla/5.0'},
+                timeout=15
+            )
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            return {
+                'repurposing_status': self._parse_repurposing_status(soup),
+                'clinical_trials': self._parse_clinical_trials(soup),
+                'source_url': response.url
+            }
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"CoviDrug request failed for {drug_id}: {str(e)}")
+            return {'error': f"Network error: {str(e)}"}
+        except Exception as e:
+            logger.error(f"CoviDrug parsing failed for {drug_id}: {str(e)}")
+            return {'error': 'Failed to parse drug information'}
+
+    def _parse_repurposing_status(self, soup: BeautifulSoup) -> str:
+        """Extract repurposing status from HTML"""
+        status_div = soup.find('div', class_='repurposing-status')
+        return status_div.text.strip() if status_div else 'Unknown'
+
+    def _parse_clinical_trials(self, soup: BeautifulSoup) -> list:
+        """Extract clinical trial information from HTML"""
+        trials = []
+        for card in soup.select('.trial-card'):
+            try:
+                trials.append({
+                    'phase': card.select_one('.trial-phase').text,
+                    'status': card.select_one('.trial-status').text,
+                    'identifier': card.select_one('.trial-id').text
+                })
+            except AttributeError:
+                continue
+        return trials
+
+    @staticmethod
+    def calculate_tanimoto(fp1, fp2) -> float:
+        """
+        Calculate Tanimoto similarity between fingerprints
+        Uses RDKit's optimized implementation
+        """
+        return DataStructs.TanimotoSimilarity(fp1, fp2)
+./app/services/docking.py
+# app/services/docking.py
+"""
+AutoDock Vina integration implementing insilico.txt section 4 requirements
+Handles docking preparation, execution, and result processing
+"""
+
+import logging
+import subprocess
+from pathlib import Path
+from typing import Dict, List
+from django.conf import settings
+from rdkit import Chem
+from rdkit.Chem import AllChem, rdDistGeom, rdForceFieldHelpers
+from MDAnalysis import Universe
+import tempfile
+import shutil
+
+logger = logging.getLogger(__name__)
+
+class DockingEngine:
+    """Handles complete docking workflow from preparation to execution"""
+    
+    def __init__(self, target_pdb: str, compound_data: Dict):
+        self.target_pdb = Path(target_pdb).resolve()
+        self.compound_data = compound_data
+        self.work_dir = Path(tempfile.mkdtemp(dir=settings.MEDIA_ROOT))
+        self.receptor_pdbqt = self.work_dir / 'receptor.pdbqt'
+        self.ligand_pdbqt = self.work_dir / 'ligand.pdbqt'
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Cleanup temporary files"""
+        if not settings.DEBUG:
+            shutil.rmtree(self.work_dir, ignore_errors=True)
+
+    def prepare_receptor(self) -> str:
+        """Convert target PDB to PDBQT using AutoDockTools"""
+        try:
+            if not self.target_pdb.exists():
+                raise FileNotFoundError(f"Target PDB not found: {self.target_pdb}")
+            
+            cmd = [
+                'prepare_receptor4.py',
+                '-r', str(self.target_pdb),
+                '-o', str(self.receptor_pdbqt),
+                '-A', 'checkhydrogens'
+            ]
+            
+            result = subprocess.run(
+                cmd,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True
+            )
+            logger.debug(f"Receptor prepared: {result.stdout}")
+            return str(self.receptor_pdbqt)
+            
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Receptor prep failed: {e.stdout}")
+            raise ValueError("Receptor preparation error") from e
+
+    def prepare_ligand(self) -> str:
+        """Prepare ligand PDBQT from various input types"""
+        try:
+            if self.compound_data['type'] == 'SMILES':
+                return self._process_smiles(self.compound_data['data'])
+            return self._process_pdb(self.compound_data['data'])
+        except KeyError as e:
+            logger.error(f"Invalid compound data: {str(e)}")
+            raise ValueError("Invalid ligand input format") from e
+
+    def _process_smiles(self, smiles: str) -> str:
+        """Convert SMILES to 3D PDBQT via RDKit and OBabel"""
+        try:
+            # Generate 3D structure with RDKit
+            mol = Chem.MolFromSmiles(smiles)
+            if not mol:
+                raise ValueError("Invalid SMILES structure")
+                
+            mol = Chem.AddHs(mol)
+            rdDistGeom.EmbedMolecule(mol)
+            rdForceFieldHelpers.MMFFOptimizeMolecule(mol)
+            
+            # Save temporary PDB
+            temp_pdb = self.work_dir / 'ligand.pdb'
+            Chem.MolToPDBFile(mol, str(temp_pdb))
+            
+            # Convert to PDBQT
+            return self._convert_to_pdbqt(temp_pdb)
+            
+        except Exception as e:
+            logger.error(f"SMILES processing failed: {str(e)}")
+            raise
+
+    def _process_pdb(self, pdb_path: str) -> str:
+        """Convert PDB to PDBQT using AutoDockTools"""
+        try:
+            input_pdb = Path(pdb_path).resolve()
+            if not input_pdb.exists():
+                raise FileNotFoundError(f"Ligand PDB not found: {input_pdb}")
+                
+            return self._convert_to_pdbqt(input_pdb)
+        except Exception as e:
+            logger.error(f"PDB processing failed: {str(e)}")
+            raise
+
+    def _convert_to_pdbqt(self, pdb_path: Path) -> str:
+        """Generic PDB to PDBQT conversion"""
+        cmd = [
+            'prepare_ligand4.py',
+            '-l', str(pdb_path),
+            '-o', str(self.ligand_pdbqt),
+            '-A', 'hydrogens'
+        ]
+        
+        try:
+            result = subprocess.run(
+                cmd,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True
+            )
+            logger.debug(f"Ligand converted: {result.stdout}")
+            return str(self.ligand_pdbqt)
+            
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Ligand conversion failed: {e.stdout}")
+            raise ValueError("Ligand preparation error") from e
+
+    def configure_docking(self) -> Dict:
+        """Generate docking parameters from target structure"""
+        try:
+            u = Universe(str(self.target_pdb))
+            protein = u.select_atoms("protein")
+            centroid = protein.centroid()
+            
+            return {
+                'center': centroid.tolist(),
+                'box_size': settings.VINA_BOX_SIZE,
+                'exhaustiveness': settings.VINA_EXHAUSTIVENESS,
+                'cpu': settings.VINA_CPU_CORES,
+                'num_poses': settings.VINA_NUM_POSES
+            }
+        except Exception as e:
+            logger.error(f"Docking config failed: {str(e)}")
+            raise
+
+    def run_docking(self) -> Dict:
+        """Execute AutoDock Vina and return results"""
+        try:
+            config = self.configure_docking()
+            
+            cmd = [
+                'vina',
+                '--receptor', str(self.receptor_pdbqt),
+                '--ligand', str(self.ligand_pdbqt),
+                '--center_x', str(config['center'][0]),
+                '--center_y', str(config['center'][1]),
+                '--center_z', str(config['center'][2]),
+                '--size_x', str(config['box_size'][0]),
+                '--size_y', str(config['box_size'][1]),
+                '--size_z', str(config['box_size'][2]),
+                '--exhaustiveness', str(config['exhaustiveness']),
+                '--cpu', str(config['cpu']),
+                '--num_modes', str(config['num_poses'])
+            ]
+            
+            result = subprocess.run(
+                cmd,
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            
+            return DockingResultsParser.parse_vina_output(result.stdout)
+            
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Docking failed: {e.stderr}")
+            raise ValueError("Docking execution error") from e
+
+class DockingResultsParser:
+    """Processes and formats raw Vina output"""
+    
+    @staticmethod
+    def parse_vina_output(output: str) -> Dict:
+        """Extract docking results from Vina stdout"""
+        try:
+            lines = output.split('\n')
+            modes: List[Dict] = []
+            current_mode: Dict = {}
+
+            for line in lines:
+                if '-----+' in line:  # Table header
+                    continue
+                if line.startswith('MODEL'):
+                    current_mode = {
+                        'model_id': int(line.split()[1]),
+                        'pose': [],
+                        'affinity': 0.0,
+                        'rmsd_lower': 0.0,
+                        'rmsd_upper': 0.0
+                    }
+                elif line.startswith('ENDMDL'):
+                    modes.append(current_mode)
+                elif line.startswith('REMARK VINA RESULT:'):
+                    parts = line.split()
+                    current_mode.update({
+                        'affinity': float(parts[3]),
+                        'rmsd_lower': float(parts[4]),
+                        'rmsd_upper': float(parts[5])
+                    })
+                elif line.startswith('ATOM') or line.startswith('HETATM'):
+                    current_mode['pose'].append(line)  # Now properly typed as list
+            
+            return {
+                'poses': modes,
+                'best_affinity': min(m['affinity'] for m in modes) if modes else None,
+                'raw_output': output
+            }
+        except Exception as e:
+            logger.error(f"Result parsing failed: {str(e)}")
+            raise
+
+
+    @staticmethod
+    def generate_report(raw_results: Dict) -> Dict:
+        """Create comprehensive docking report"""
+        return {
+            'summary': {
+                'best_affinity': raw_results['best_affinity'],
+                'total_poses': len(raw_results['poses']),
+                'mean_affinity': sum(p['affinity'] for p in raw_results['poses']) / len(raw_results['poses'])
+            },
+            'visualization': {
+                'complex_pdb': DockingResultsParser._generate_complex_pdb(raw_results),
+                'interactions': DockingResultsParser._analyze_interactions(raw_results)
+            },
+            'raw_data': raw_results
+        }
+
+    @staticmethod
+    def _generate_complex_pdb(results: Dict) -> str:
+        """Generate receptor-ligand complex structure"""
+        try:
+            # In production, implement proper complex generation
+            return "\n".join(results['poses'][0]['pose'])
+        except Exception as e:
+            logger.error(f"Complex generation failed: {str(e)}")
+            return ""
+
+    @staticmethod
+    def _analyze_interactions(results: Dict) -> List[str]:
+        """Analyze ligand-protein interactions"""
+        # Implement actual interaction analysis
+        return ["Hydrogen bond: Atom1-Atom2", "Hydrophobic: ResidueX"]
+./app/services/conversions.py
+# app/services/conversions.py
+"""
+Molecular input conversions implementing insilico.txt section 2 requirements
+Handles: SMILES, PDB, peptide, and biomolecule inputs
+"""
+
+import subprocess
+import re
+from typing import Dict
+from django.conf import settings
+from rdkit import Chem
+from rdkit.Chem import AllChem, rdDepictor
+from rdkit.Chem import Draw
+from chemistry_adapters import AminoAcidAdapter
+import logging
+
+logger = logging.getLogger(__name__)
+rdDepictor.SetPreferCoordGen(True)  # Better 2D coordinate generation
+
+class ConversionEngine:
+    """
+    Main conversion router for section 2 inputs
+    Implements requirements for:
+    - MarvinJS → SMILES (2a)
+    - Peptide → SMILES (2b)
+    - Biomolecule → PDB via AlphaFold (2c)
+    """
+    
+    def __init__(self):
+        self.aa_adapter = AminoAcidAdapter()
+
+    def marvin_to_smiles(self, mrv_data: str) -> Dict:
+        """
+        Convert MarvinJS sketches to validated SMILES
+        Args:
+            mrv_data: MRV string from MarvinJS
+        Returns: Dict with SMILES and validation data
+        """
+        try:
+            mol = Chem.MolFromMrvBlock(mrv_data)
+            if not mol:
+                return {'error': 'Invalid MRV structure'}
+            
+            Chem.SanitizeMol(mol)
+            smiles = Chem.MolToSmiles(mol, isomericSmiles=True)
+            
+            if not ValidationTools.validate_smiles(smiles):
+                return {'error': 'Invalid SMILES generated'}
+            
+            return {
+                'smiles': smiles,
+                'type': 'small_molecule',
+                'structure_2d': self._generate_2d_svg(mol),
+                'validation': {'valid': True}
+            }
+            
+        except Exception as e:
+            logger.error(f"MarvinJS conversion failed: {str(e)}")
+            return {'error': str(e)}
+
+    def peptide_to_smiles(self, sequence: str) -> Dict:
+        """
+        Convert short peptides (<20aa) to SMILES using PepSMI
+        Args:
+            sequence: Amino acid sequence
+        Returns: Dict with SMILES and validation data
+        """
+        try:
+            clean_seq = re.sub(r'\s+', '', sequence).upper()
+            validation = ValidationTools.validate_peptide(clean_seq)
+            if not validation['valid']:
+                return validation
+                
+            smiles = self.aa_adapter.convert_amino_acid_sequence_to_smiles(clean_seq)
+            
+            if not ValidationTools.validate_smiles(smiles):
+                return {'error': 'Invalid SMILES from peptide'}
+                
+            return {
+                'smiles': smiles,
+                'type': 'peptide',
+                'structure_2d': self._generate_2d_svg(Chem.MolFromSmiles(smiles)),
+                'validation': validation
+            }
+            
+        except Exception as e:
+            logger.error(f"Peptide conversion failed: {str(e)}")
+            return {'error': str(e)}
+
+    def run_alphafold(self, sequence: str) -> Dict:
+        """
+        Generate 3D structure via AlphaFold Docker
+        Args:
+            sequence: Long biomolecule sequence
+        Returns: Dict with CIF data and processing info
+        """
+        try:
+            cmd = [
+                'docker', 'run', '--rm',
+                '-e', f'AF_KEY={settings.ALPHAFOLD_API_KEY}',
+                settings.ALPHAFOLD_DOCKER_IMAGE,
+                '--sequence', sequence,
+                '--output', '/dev/stdout'
+            ]
+            
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=settings.SUBPROCESS_TIMEOUT  
+            )
+            
+            if result.returncode != 0:
+                return {'error': f"AlphaFold error: {result.stderr}"}
+                
+            return {
+                'cif_data': result.stdout,
+                'job_id': f"AF-{hash(sequence)}",
+                'warnings': result.stderr.splitlines()
+            }
+            
+        except subprocess.TimeoutExpired:
+            return {'error': 'AlphaFold processing timed out'}
+        except Exception as e:
+            logger.error(f"AlphaFold failed: {str(e)}")
+            return {'error': str(e)}
+
+    def cif_to_pdb(self, cif_data: str) -> Dict:
+        """
+        Convert CIF to PDB using mmcif2pdb
+        Args:
+            cif_data: CIF format string
+        Returns: Dict with PDB data and validation
+        """
+        try:
+            result = subprocess.run(
+                ['mmcif2pdb', '-'],
+                input=cif_data,
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=settings.SUBPROCESS_TIMEOUT
+            )
+            
+            validation = ValidationTools.validate_pdb(result.stdout)
+            if not validation['valid']:
+                return {'error': validation.get('error', 'Invalid PDB')}
+            
+            return {
+                'pdb_data': result.stdout,
+                'validation': validation,
+                'warnings': result.stderr.splitlines()
+            }
+            
+        except subprocess.CalledProcessError as e:
+            return {'error': f"Conversion failed: {e.stderr}"}
+        except Exception as e:
+            logger.error(f"CIF conversion failed: {str(e)}")
+            return {'error': str(e)}
+
+    def _generate_2d_svg(self, mol: Chem.Mol) -> str:
+        """Generate 2D structure visualization for UI"""
+        Draw.PrepareMolForDrawing(mol)
+        return Draw.MolToSVG(mol)
+
+class ValidationTools:
+    """
+    Input validation methods for section 2 requirements
+    Implements checks for:
+    - SMILES validity
+    - PDB quality
+    - Sequence validity
+    """
+    
+    @staticmethod
+    def validate_smiles(smiles: str) -> bool:
+        """Comprehensive SMILES validation using RDKit"""
+        mol = Chem.MolFromSmiles(smiles)
+        return mol is not None and mol.GetNumAtoms() > 0
+
+    @staticmethod
+    def validate_pdb(pdb_content: str) -> Dict:
+        """Validate PDB structure and resolution"""
+        validation = {'valid': True, 'warnings': []}
+        
+        # Resolution check
+        for line in pdb_content.split('\n'):
+            if line.startswith('REMARK   2 RESOLUTION.'):
+                try:
+                    res = float(line.split()[-1])
+                    if res > settings.MAX_PDB_RESOLUTION:
+                        validation.update({
+                            'valid': False,
+                            'error': f"Resolution {res}Å exceeds limit"
+                        })
+                except (IndexError, ValueError):
+                    validation['warnings'].append("Invalid resolution format")
+        
+        # Structural validation
+        mol = Chem.MolFromPDBBlock(pdb_content)
+        if not mol or mol.GetNumAtoms() == 0:
+            validation.update({
+                'valid': False,
+                'error': "Invalid PDB structure"
+            })
+            
+        return validation
+
+    @staticmethod
+    def validate_peptide(sequence: str) -> Dict:
+        """Validate amino acid sequence composition"""
+        if len(sequence) == 0:
+            return {'valid': False, 'error': 'Empty sequence'}
+            
+        if not re.fullmatch(r'^[ACDEFGHIKLMNPQRSTVWY]+$', sequence):
+            invalid = set(sequence) - set("ACDEFGHIKLMNPQRSTVWY")
+            return {
+                'valid': False,
+                'error': f"Invalid amino acids: {', '.join(invalid)}"
+            }
+            
+        return {'valid': True, 'sequence': sequence}
+./app/middleware.py
+# middleware.py
+from django.http import JsonResponse
+from django.shortcuts import redirect
+from django.urls import resolve
+
+
+class PipelineValidationMiddleware:
+    """Ensures screening pipeline sequence is followed"""
+    
+    def __init__(self, get_response):
+        self.get_response = get_response
+        self.pipeline_steps = [
+            'target_selection',
+            'compound_input',
+            'validation',
+            'similarity_check',
+            'docking_progress',
+            'results'
+        ]
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        return response
+
+    def process_view(self, request, view_func, view_args, view_kwargs):
+        current_step = resolve(request.path_info).url_name
+        
+        if current_step in self.pipeline_steps:
+            if not self.validate_pipeline_progression(request, current_step):
+                return redirect('target_selection')
+
+    def validate_pipeline_progression(self, request, current_step):
+        """Check session for valid pipeline state"""
+        session_steps = request.session.get('pipeline_steps', [])
+        
+        # Allow returning to previous steps
+        if current_step in session_steps:
+            return True
+            
+        # Check sequential progression
+        expected_step = self.pipeline_steps[len(session_steps)]
+        if current_step != expected_step:
+            return False
+            
+        request.session['pipeline_steps'] = session_steps + [current_step]
+        return True
+
+class SecurityHeadersMiddleware:
+    """Adds security headers for molecular data"""
+    
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        response['Content-Security-Policy'] = "default-src 'self'"
+        response['X-Content-Type-Options'] = 'nosniff'
+        return response./inSilicoScreening/__init__.py
 """
 Package for inSilicoScreening.
 """
 from .celery import app as celery_app
 
-__all__ = ('celery_app',)
-./inSilicoScreening/admin.py
+__all__ = ('celery_app',)./inSilicoScreening/admin.py
 from django.contrib import admin
 from app.models import Target, Compound, KnownDrug
 
 admin.site.register(Target)
 admin.site.register(Compound)
 admin.site.register(KnownDrug)./inSilicoScreening/celery.py
+# inSilicoScreening/celery.py
 import os
 from celery import Celery
+from django.conf import settings
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'inSilicoScreening.settings')
 app = Celery('inSilicoScreening')
 app.config_from_object('django.conf:settings', namespace='CELERY')
 app.autodiscover_tasks()
+
+@app.task(bind=True)
+def debug_task(self):
+    print(f'Request: {self.request!r}')
+./inSilicoScreening/wsgi.py
+"""
+WSGI config for inSilicoScreening project.
+
+This module contains the WSGI application used by Django's development server
+and any production WSGI deployments. It should expose a module-level variable
+named ``application``. Django's ``runserver`` and ``runfcgi`` commands discover
+this application via the ``WSGI_APPLICATION`` setting.
+
+Usually you will have the standard Django WSGI application here, but it also
+might make sense to replace the whole Django WSGI application with a custom one
+that later delegates to the Django one. For example, you could introduce WSGI
+middleware here, or combine a Django application with an application of another
+framework.
+
+For more information, visit
+https://docs.djangoproject.com/en/2.1/howto/deployment/wsgi/
+"""
+
+import os
+from django.core.wsgi import get_wsgi_application
+
+os.environ.setdefault(
+    'DJANGO_SETTINGS_MODULE',
+    'inSilicoScreening.settings')
+
+# This application object is used by any WSGI server configured to use this
+# file. This includes Django's development server, if the WSGI_APPLICATION
+# setting points here.
+application = get_wsgi_application()
 ./inSilicoScreening/settings.py
 import os
 from pathlib import Path
@@ -388,6 +2484,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'app.middleware.PipelineValidationMiddleware',  # Custom
+    'app.middleware.SecurityHeadersMiddleware',     # Custom
 ]
 
 ROOT_URLCONF = 'inSilicoScreening.urls'
@@ -418,27 +2516,13 @@ DATABASES = {
     }
 }
 
-AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
-]
-
-# Internationalization
-LANGUAGE_CODE = 'en-us'
 # Static and Media Files
-STATIC_URL = '/static/'
-STATICFILES_DIRS = [BASE_DIR / 'app' / 'static']
-STATIC_ROOT = posixpath.join(*(BASE_DIR.parts + ('static',)))
+STATIC_URL = '/static/'  # URL prefix for static files
+STATIC_ROOT = BASE_DIR / 'staticfiles'  # Collected files directory
+STATICFILES_DIRS = [
+    BASE_DIR / 'static',  # Your main static files directory
+    BASE_DIR / 'app/static/app',  # App-specific static files (if needed)
+]
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
@@ -450,17 +2534,23 @@ CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
+CORS_ALLOWED_ORIGINS = [
+    'https://marvinjs.chemicalize.com',
+    'https://webservices.chemicalize.com'
+]
 CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:8000',
     'http://127.0.0.1:80',
     'http://10.2.0.32:8000',
     'http://10.2.0.32:8001',
     'http://127.0.0.1:8001',
+    'https://*.chemicalize.com',  # For MarvinJS web services
+    'https://marvinjs.chemicalize.com'
 ]
 
 # Redirect URLs after login/logout
-LOGIN_REDIRECT_URL = 'home'
-LOGOUT_REDIRECT_URL = 'home'
+LOGIN_REDIRECT_URL = 'index'
+LOGOUT_REDIRECT_URL = 'index'
 
 # settings.py
 FILE_UPLOAD_MAX_MEMORY_SIZE = 26214400  # 25MB
@@ -476,27 +2566,141 @@ SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
 DEBUG = True  # Never run with DEBUG=True in production!
 
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# settings.py
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'DEBUG',
+    },
+}
+
+AUTH_PASSWORD_VALIDATORS = [
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
+]
+
+LANGUAGE_CODE = 'en-us'
+TIME_ZONE = 'UTC'
+USE_I18N = True
+USE_TZ = True
+
+# Celery Configuration
+CELERY_CACHE_BACKEND = 'django-cache'
+
+# Custom project settings
+PDB_VALIDATION_RESOLUTION = 3.0
+MAX_SMILES_LENGTH = 500
+MAX_SEQUENCE_LENGTH = 2000
+# inSilicoScreening/settings.py
+COVIDRUG_API_ENDPOINT = "https://covirus.cc/api/v2"
+# Add these to Django settings
+SUBPROCESS_TIMEOUT = 300  # 5 minutes
+VINA_CONFIG = {
+    'BOX_SIZE': [20, 20, 20],
+    'EXHAUSTIVENESS': 32,
+    'CPU_CORES': 4,
+    'RANDOM_SEED': 42
+}
+ALPHAFOLD_TIMEOUT = 600  # 10 minutes
+MAX_PDB_RESOLUTION = 3.0
+# settings.py
+TTD_API_ENDPOINT = "https://api.covirus.cc/drugs/v1"
+TTD_API_KEY = os.getenv("TTD_API_KEY")
+JSON_ENCODER = 'app.utils.ChemistryJSONEncoder'
+
+"""
+Project configuration (insilico.txt dependencies)
+"""
+
+# API Endpoints
+TTD_API_URL = "https://api.pharmadb.org/ttd/v1" 
+COVIDRUG_SCRAPE_URL = "https://covdrug.org/drug"
+
+# File Paths
+ALPHAFOLD_DOCKER_IMAGE = "alphafold:latest"
+VINA_EXECUTABLE = "/opt/vina/bin/vina"
+
+# Validation Thresholds
+SIMILARITY_THRESHOLD = 0.85  # Section 3
+MAX_PDB_RESOLUTION = 3.0     # Section 2
 ./inSilicoScreening/urls.py
-from django.urls import path
+# inSilicoScreening/urls.py
+from django.urls import path, include
+from django.views.generic import RedirectView
 from app import views
 from django.contrib.auth import views as auth_views
-from django.views.generic import TemplateView
 
 urlpatterns = [
-    path('', views.home, name='home'),
-    path('about/', TemplateView.as_view(
-        template_name='app/about.html'
-    ), name='about'),
-    path('contact/', TemplateView.as_view(
-        template_name='app/contact.html'
-    ), name='contact'),
-    path('login/', auth_views.LoginView.as_view(
-            template_name='app/login.html',
-            redirect_authenticated_user=True
-        ), name='login'),
-    path('logout/', auth_views.LogoutView.as_view(
-            template_name='app/logout.html'
-        ), name='logout'),
-    path('register/', views.register, name='register'),
-    #other html files urls
-]
+    # Workflow Navigation
+    path('', views.IndexView.as_view(), name='index'),
+    path('select-target/', views.TargetSelectionView.as_view(), name='target_selection'),
+    
+    # Compound Input Subsystem with Integrated Validation
+    path('input/small-molecule/', 
+         views.SmallMoleculeInputView.as_view(), 
+         name='small_molecule'),
+    path('input/peptide/', 
+         views.PeptideInputView.as_view(), 
+         name='peptide'),
+    path('input/biomolecule/', 
+         views.BiomoleculeInputView.as_view(), 
+         name='biomol'),
+    # Validation
+    path('validation/<uuid:job_id>/', 
+         views.ValidationFeedbackView.as_view(), 
+         name='validation_feedback'),
+    # Workflow Progress Tracking
+    path('similarity-check/<uuid:job_id>/', 
+         views.SimilarityCheckView.as_view(), 
+         name='similarity_check'),
+    path('docking/<uuid:job_id>/', 
+         views.DockingProgressView.as_view(), 
+         name='docking_progress'),
+    
+    # Results & Visualization
+    path('results/<uuid:job_id>/', 
+         views.ResultsVisualizationView.as_view(), 
+         name='results_visualization'),
+    path('results/<uuid:job_id>/summary/', 
+         views.ResultsSummaryView.as_view(), 
+         name='results_summary'),
+    path('login/', auth_views.LoginView.as_view(template_name='app/login.html'), name = 'login'),
+    path('logout/', auth_views.LogoutView.as_view(), name='logout'),
+    path('register/', views.register, name='register')
+
+]./manage.py
+#!/usr/bin/env python
+"""
+Command-line utility for administrative tasks.
+
+# For more information about this file, visit
+# https://docs.djangoproject.com/en/2.1/ref/django-admin/
+"""
+
+import os
+import sys
+
+if __name__ == '__main__':
+    os.environ.setdefault(
+        'DJANGO_SETTINGS_MODULE',
+        'inSilicoScreening.settings')
+    try:
+        from django.core.management import execute_from_command_line
+    except ImportError as exc:
+        raise ImportError(
+            "Couldn't import Django. Are you sure it's installed and "
+            "available on your PYTHONPATH environment variable? Did you "
+            "forget to activate a virtual environment?"
+        ) from exc
+    execute_from_command_line(sys.argv)

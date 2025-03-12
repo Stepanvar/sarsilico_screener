@@ -1,0 +1,50 @@
+<html>
+{% load static %}
+<head>
+  <!-- 1. Enhanced Nonce Propagation -->
+  <script nonce="{{ request.csp_nonce }}">
+    // Monkey-patch DOM methods BEFORE loading JSME
+    const nonce = "{{ request.csp_nonce }}";
+    const originalCreateElement = document.createElement;
+    document.createElement = function(tag) {
+      const el = originalCreateElement.call(document, tag);
+      if (tag.toLowerCase() === 'script') el.nonce = nonce;
+      return el;
+    };
+    
+    // Patch element.appendChild
+    const originalAppendChild = Element.prototype.appendChild;
+    Element.prototype.appendChild = function(child) {
+      if (child.tagName === 'SCRIPT' && !child.nonce) {
+        child.nonce = nonce;
+      }
+      return originalAppendChild.call(this, child);
+    };
+  </script>
+
+  <!-- 2. Load JSME with Nonce -->
+  <script nonce="{{ request.csp_nonce }}" 
+          src="{% static 'jsme/jsme.nocache.js' %}"></script>
+
+  <!-- 3. Safe Initialization -->
+  <script nonce="{{ request.csp_nonce }}">
+    let jsmeApplet;
+    
+    // Use JSME's built-in ready state
+    if (window.JSApplet) {
+        jsmeOnLoad();
+    } else {
+      window.addEventListener('jsme_ready', initJSME);
+    }
+
+    function jsmeOnLoad() {
+      jsmeApplet = new JSApplet.JSME("jsme_container", "1000px", "1000px", {
+        "options": "marker"
+      });
+    }
+  </script>
+</head>
+<body>
+  <div id="jsme_container"></div>
+</body>
+</html>

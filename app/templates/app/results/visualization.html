@@ -1,0 +1,67 @@
+{% extends "app/base.html" %}
+
+{% block content %}
+<div class="visualization-container">
+    <div class="viewer-controls">
+        <div class="view-modes">
+            <button class="btn-view" data-representation="cartoon">Protein</button>
+            <button class="btn-view" data-representation="surface">Surface</button>
+            <button class="btn-view" data-representation="ball+stick">Ligand</button>
+        </div>
+        
+        <div class="download-options">
+            <button class="btn-download" data-format="pdb">Download PDB</button>
+            <button class="btn-download" data-format="sdf">Download SDF</button>
+        </div>
+    </div>
+    
+    <div id="ngl-viewer" style="width: 100%; height: 600px;"></div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const stage = new NGL.Stage("ngl-viewer");
+    
+    // Load target structure
+    stage.loadFile("{% static target_pdb %}", { defaultRepresentation: true })
+        .then(component => {
+            component.addRepresentation('cartoon', { color: 'residueindex' });
+        });
+    
+    // Load ligand structure
+    stage.loadFile("{{ ligand_url }}")
+        .then(component => {
+            component.addRepresentation('ball+stick');
+            component.autoView();
+        });
+
+    // visualization.html
+    const visualizationPresets = {
+        protein: {
+            representations: ['cartoon'],
+            colorScheme: 'residueindex'
+        },
+        ligand: {
+            representations: ['ball+stick'],
+            colorScheme: 'element'
+        },
+        surface: {
+            representations: ['surface'],
+            colorScheme: 'hydrophobicity'
+        }
+    };
+
+    // Usage in view mode switching
+    document.querySelectorAll('.btn-view').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const preset = visualizationPresets[btn.dataset.representation];
+            stage.removeAllComponents();
+            stage.loadFile("{{ complex_url }}", {
+                representations: preset.representations,
+                colorScheme: preset.colorScheme
+            });
+        });
+    });
+});
+</script>
+{% endblock %}

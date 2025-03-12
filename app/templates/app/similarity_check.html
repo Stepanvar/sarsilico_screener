@@ -1,0 +1,36 @@
+{% extends "app/base.html" %}
+
+{% block content %}
+<div class="similarity-results">
+  {% if similar_drugs %}
+  <div class="warning-card">
+    <h3>⚠️ Similar Drugs Found</h3>
+    <ul class="drug-list">
+      {% for drug in similar_drugs %}
+      <li>
+        <strong>{{ drug.name }}</strong> (Tanimoto: {{ drug.score }})
+        <a href="{{ drug.coviDrug_url }}" target="_blank">View in CoviDrug</a>
+      </li>
+      {% endfor %}
+    </ul>
+    
+    <div class="actions">
+      <button class="btn-secondary" onclick="history.back()">Modify Compound</button>
+      <button class="btn-warning" id="force-continue">Continue Anyway</button>
+    </div>
+  </div>
+  {% else %}
+  <div class="novel-card">
+    <h3>✅ Novel Structure Detected</h3>
+    <p>Proceeding to docking simulation...</p>
+    <div class="loading-spinner"></div>
+  </div>
+  {% endif %}
+</div>
+<script>
+    document.getElementById('force-continue').addEventListener('click', () => {
+        fetch("{% url 'override_similarity' %}", {method: 'POST'})
+         .then(() => window.location.href = "{% url 'docking_progress' %}");
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends "app/base.html" %}
+
+{% block content %}
+<div class="biomolecule-flow">
+  <!-- Sequence Input -->
+  <textarea id="sequence-input" 
+            placeholder="Enter protein/nucleotide sequence"></textarea>
+  <div id="sequence-validation"></div>
+
+  <!-- Conversion Pipeline -->
+  <div class="conversion-steps">
+    <div class="step" id="alphafold-step">
+      <h4>1. Structure Prediction</h4>
+      <div class="progress-bar"></div>
+    </div>
+    
+    <div class="step" id="cif-conversion-step">
+      <h4>2. CIF to PDB Conversion</h4>
+      <div class="progress-bar"></div>
+    </div>
+  </div>
+
+  <button id="run-conversion">Start Processing</button>
+</div>
+
+<script>
+document.getElementById('run-conversion').addEventListener('click', async () => {
+  const sequence = document.getElementById('sequence-input').value;
+  
+  // Start AlphaFold prediction
+  const response = await fetch('/api/run_alphafold', {
+    method: 'POST',
+    body: JSON.stringify({sequence}) 
+  });
+  
+  // Update UI with conversion progress
+  updateConversionStatus(response.job_id);
+});
+</script>
+<script>
+    function updateConversionStatus(jobId) {
+        const eventSource = new EventSource(`/api/conversion/${jobId}/status`);
+        
+        eventSource.addEventListener('error', () => {
+            alert('AlphaFold prediction failed - please try shorter sequence');
+            eventSource.close();
+        });
+    }
+</script>
+{% endblock %}

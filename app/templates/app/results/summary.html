@@ -1,0 +1,51 @@
+{% extends "app/base.html" %}
+
+{% block content %}
+<div class="similarity-alert">
+    {% if similarity.match %}
+<div class="similarity-alert">
+    <h5>TTD Match: {{ similarity.name }}</h5>
+    <table class="similarity-table">
+        <tr><th>Tanimoto Score</th><td>{{ similarity.score }}</td></tr>
+        <tr><th>CoviDrug Entry</th><td><a href="{{ similarity.covidrug_url }}" target="_blank">View details</a></td></tr>
+        <tr><th>TTD ID</th><td>{{ similarity.ttd_id }}</td></tr>
+    </table>
+</div>
+{% endif %}
+</div>
+
+<div class="results-summary">
+    <h2>Screening Results</h2>
+    
+    <div class="score-card">
+        <div class="main-score">
+            <span class="value">{{ score }}</span>
+            <span class="label">Vina Affinity Score</span>
+        </div>
+        
+        <div class="score-details">
+            <div class="detail">
+                <span class="label">Target</span>
+                <span class="value">{{ target_pdb }}</span>
+            </div>
+            <div class="detail">
+                <span class="label">Ligand</span>
+                <span class="value">{{ ligand_name }}</span>
+            </div>
+            <div class="detail">
+                <span class="label">Processing Time</span>
+                <span class="value">{{ duration }}s</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="actions">
+        <a href="{% url 'visualization' job_id %}" class="btn btn-primary">
+            View 3D Structure
+        </a>
+        <a href="{{ report_url }}" class="btn btn-secondary">
+            Download Full Report
+        </a>
+    </div>
+</div>
+{% endblock %}

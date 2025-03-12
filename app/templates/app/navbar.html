@@ -1,67 +1,54 @@
-<nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
     <div class="container-fluid">
-        <a class="navbar-brand" href="{% url 'home' %}">
-            SARSilico Screener
+        <a class="navbar-brand" href="{% url 'index' %}">
+            
         </a>
+        
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
             <span class="navbar-toggler-icon"></span>
         </button>
 
         <div class="collapse navbar-collapse" id="mainNav">
             <ul class="navbar-nav me-auto">
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" role="button" 
-                       data-bs-toggle="dropdown" aria-expanded="false">
-                        Submit
+                {% comment %} <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        Start Screening
                     </a>
-                    <ul class="dropdown-menu dropdown-menu-dark">
-                        <li><a class="dropdown-item" href="{% url 'smiles_input' %}">Small Molecules</a></li>
-                        <li><a class="dropdown-item" href="{% url 'pdb_upload' %}">Peptide/Antibody</a></li>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="{% url 'input/small_molecule' %}">Small Molecules</a></li>
+                        <li><a class="dropdown-item" href="{% url 'input/biomol' %}">Peptides/Antibodies</a></li>
                     </ul>
                 </li>
-                
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle active" href="#" role="button" 
-                       data-bs-toggle="dropdown" aria-expanded="false">
-                        Analysis
-                    </a>
-                    <ul class="dropdown-menu dropdown-menu-dark">
-                        <li><a class="dropdown-item" href="{% url 'similarity_analysis' %}">Similarity Check</a></li>
-                        <li><a class="dropdown-item" href="{% url 'docking' %}">Molecular Docking</a></li>
-                        <li><a class="dropdown-item" href="{% url 'sequence_conversion' %}">Sequence Conversion</a></li>
-                    </ul>
-                </li>
-
                 <li class="nav-item">
-                    <a class="nav-link" href="{% url 'target_selection' %}">Target Selection</a>
+                    <a class="nav-link" href="{% url 'target_selection' %}">Target Library</a>
                 </li>
-                
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" role="button" 
-                       data-bs-toggle="dropdown" aria-expanded="false">
-                        Results
-                    </a>
-                    <ul class="dropdown-menu dropdown-menu-dark">
-                        <li><a class="dropdown-item" href="{% url 'job_status' %}">Job Status</a></li>
-                        <li><a class="dropdown-item" href="{% url 'example_results' %}">Examples</a></li>
-                    </ul>
+                {% comment %} <li class="nav-item">
+                    <a class="nav-link" href="{% url 'results_summary' %}">My Results</a>
                 </li>
             </ul>
             
             <ul class="navbar-nav ms-auto">
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'tutorial' %}">
-                        <i class="bi bi-journal-text"></i> Tutorial
+                {% if user.is_authenticated %}
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-person-circle"></i> {{ user.username }}
                     </a>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="#">Profile</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{% url 'logout' %}">Logout</a></li>
+                    </ul>
+                </li>
+                {% else %}
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'login' %}">Login</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="{% url 'citation' %}">
-                        <i class="bi bi-book"></i> Citations
-                    </a>
+                    <a class="nav-link" href="{% url 'register' %}">Register</a>
                 </li>
-                {% include 'app/loginpartial.html' %}
+                {% endif %} {% endcomment %}
+                        
             </ul>
         </div>
     </div>
 </nav>
-

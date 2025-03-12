@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SARSilico Screener - {% block title %}{% endblock %}</title>
+    {% load static %}
+    <link href="{% static 'css/bootstrap.min.css' %}" rel="stylesheet">
+    <link href="{% static 'css/site.css' %}" rel="stylesheet">
+    <script src="{% static 'js/jquery-3.6.0.min.js' %}"></script>
+    <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'js/promise-1.0.0.min.js' %}"></script>
+    <script src="{% static 'js/ngl.js' %}"></script>
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    {% include 'app/navbar.html' %}
+    
+    <main class="container-fluid mt-4">
+        {% block content %}{% endblock %}
+    </main>
+
+    <div id="global-alerts"></div>
+    {% block post_content %}{% endblock %}
+</body>
+</html>

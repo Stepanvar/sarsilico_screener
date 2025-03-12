@@ -1,0 +1,38 @@
+{% extends "app/base.html" %}
+
+{% block content %}
+<div class="validation-results">
+    <h3>Validation Results</h3>
+    
+    <div class="validation-card {% if valid %}valid{% else %}invalid{% endif %}">
+        <div class="status-icon">
+            {% if valid %}&#10004;{% else %}&#10008;{% endif %}
+        </div>
+        
+        <div class="validation-details">
+            <h4>{% if valid %}Valid Structure{% else %}Validation Failed{% endif %}</h4>
+            
+            {% if messages %}
+            <ul class="validation-messages">
+                {% for msg in messages %}
+                <li>{{ msg }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="actions">
+        {% if valid %}
+        <button class="btn-continue" onclick="window.history.back()">Continue</button>
+        {% else %}
+        <button class="btn-fix" onclick="window.history.back()">Modify Input</button>
+        {% endif %}
+    </div>
+</div>
+<script>
+    if(!document.cookie.includes('pipeline=validation')) {
+        window.location.href = "{% url 'target_selection' %}";
+    }
+</script>
+{% endblock %}

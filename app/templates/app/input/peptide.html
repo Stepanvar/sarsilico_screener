@@ -1,0 +1,67 @@
+{% extends "app/base.html" %}
+
+{% block content %}
+<div class="peptide-input">
+    <h2>Short Peptide Input</h2>
+    
+    <div class="input-group">
+        <textarea id="peptide-sequence" 
+                  placeholder="Enter amino acid sequence (e.g., ACGTY)"></textarea>
+        <div class="sequence-info">
+            <span id="seq-length">Length: 0 residues</span>
+            <span id="seq-validation"></span>
+        </div>
+    </div>
+    
+    <div class="actions">
+        <button id="btn-convert" class="btn-primary">Convert to SMILES</button>
+        <div id="pepsmi-result" class="hidden">
+            <code class="smiles-output"></code>
+            <button class="btn-confirm">Use This SMILES</button>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const textarea = document.getElementById('peptide-sequence');
+    const convertBtn = document.getElementById('btn-convert');
+    
+    textarea.addEventListener('input', () => {
+        document.getElementById('seq-length').textContent = 
+            `Length: ${textarea.value.length} residues`;
+    });
+    
+    convertBtn.addEventListener('click', async () => {
+        const sequence = textarea.value;
+        const response = await fetch('/api/convert/pepsmi', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({sequence})
+        });
+        
+        const result = await response.json();
+        const resultDiv = document.getElementById('pepsmi-result');
+        
+        if(result.success) {
+            resultDiv.querySelector('.smiles-output').textContent = result.smiles;
+            resultDiv.classList.remove('hidden');
+        } else {
+            document.getElementById('seq-validation').textContent = result.error;
+        }
+    });
+});
+</script>
+<script>
+    const validateSequence = (seq) => {
+        const regex = /^[ACDEFGHIKLMNPQRSTVWYUO]*$/i;
+        return regex.test(seq);
+    };
+    
+    textarea.addEventListener('input', () => {
+        const valid = validateSequence(textarea.value);
+        document.getElementById('seq-validation').textContent = 
+            valid ? '' : 'Invalid amino acid characters detected';
+    });
+    </script>
+{% endblock %}

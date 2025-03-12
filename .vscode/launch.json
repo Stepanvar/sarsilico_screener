@@ -28,8 +28,7 @@
             "runtimeArgs": [
                 "--remote-debugging-port=9222",
                 "--auto-open-devtools"
-            ],
-            "preLaunchTask": "Start Django Server"
+            ]
         }
     ],
     "compounds": [
