@@ -96,8 +96,6 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CORS_ALLOWED_ORIGINS = [
-    'https://marvinjs.chemicalize.com',
-    'https://webservices.chemicalize.com'
 ]
 CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:8000',
@@ -187,11 +185,13 @@ Project configuration (insilico.txt dependencies)
 # API Endpoints
 TTD_API_URL = "https://api.pharmadb.org/ttd/v1" 
 COVIDRUG_SCRAPE_URL = "https://covdrug.org/drug"
-
+ALPHAFOLD_DATA_DIR = "/home/s-zuev/alphafold"
 # File Paths
 ALPHAFOLD_DOCKER_IMAGE = "alphafold:latest"
-VINA_EXECUTABLE = "/opt/vina/bin/vina"
-
+VINA_BOX_SIZE = [20, 20, 20]  # Docking grid dimensions
+VINA_EXHAUSTIVENESS = 8       # Search intensity
+VINA_CPU_CORES = 4            # Processing threads
+VINA_NUM_POSES = 10           # Output poses
 # Validation Thresholds
 SIMILARITY_THRESHOLD = 0.85  # Section 3
 MAX_PDB_RESOLUTION = 3.0     # Section 2
@@ -204,8 +204,11 @@ AUTH_USER_MODEL = 'auth.User'  # Explicitly define user model
 
 # Other settings as needed (e.g., ALPHAFOLD_DOCKER_IMAGE, SUBPROCESS_TIMEOUT, etc.)
 # settings.py
-CSP_DEFAULT_SRC = ("'self'",)
+CSP_DEFAULT_SRC = ("'self'", "'unsafe-inline'", "'unsafe-eval'",    # Needed for JSME's code generation
+    "'strict-dynamic'")
 # settings.py
+CSP_STYLE_SRC = ("'self'", "https://cdn.jsdelivr.net")
+CSP_STYLE_SRC_ELEM = ("'self'", "https://cdn.jsdelivr.net")
 CSP_SCRIPT_SRC = [
     "'self'",
     "'unsafe-inline'",  # Required for JSME's GWT internals

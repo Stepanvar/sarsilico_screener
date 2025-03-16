@@ -1,50 +1,209 @@
-<html>
+{% extends 'app/base.html' %}
 {% load static %}
-<head>
-  <!-- 1. Enhanced Nonce Propagation -->
-  <script nonce="{{ request.csp_nonce }}">
-    // Monkey-patch DOM methods BEFORE loading JSME
-    const nonce = "{{ request.csp_nonce }}";
-    const originalCreateElement = document.createElement;
-    document.createElement = function(tag) {
-      const el = originalCreateElement.call(document, tag);
-      if (tag.toLowerCase() === 'script') el.nonce = nonce;
-      return el;
-    };
-    
-    // Patch element.appendChild
-    const originalAppendChild = Element.prototype.appendChild;
-    Element.prototype.appendChild = function(child) {
-      if (child.tagName === 'SCRIPT' && !child.nonce) {
-        child.nonce = nonce;
-      }
-      return originalAppendChild.call(this, child);
-    };
-  </script>
+{% block extra_head %}
 
-  <!-- 2. Load JSME with Nonce -->
-  <script nonce="{{ request.csp_nonce }}" 
-          src="{% static 'jsme/jsme.nocache.js' %}"></script>
+{% endblock %}
+{% block content %}
+<div class="container">
+    <div class="card shadow-lg">
+        <div class="card-header bg-primary text-white">
+            <h2 class="mb-0"><i class="fas fa-virus mr-2"></i>SARS-CoV-2 Drug Screening Pipeline</h2>
+        </div>
+        
+        <div class="card-body">
+            {% if messages %}
+            <div class="alert-container mb-4">
+                {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
 
-  <!-- 3. Safe Initialization -->
-  <script nonce="{{ request.csp_nonce }}">
-    let jsmeApplet;
-    
-    // Use JSME's built-in ready state
-    if (window.JSApplet) {
-        jsmeOnLoad();
-    } else {
-      window.addEventListener('jsme_ready', initJSME);
+            <form method="post" enctype="multipart/form-data" id="screeningForm" action="{% url 'index' %}">
+                {% csrf_token %}
+                
+                <!-- Target Selection -->
+                <div class="form-group">
+                    <label class="font-weight-bold" for="target">
+                        <i class="fas fa-database mr-2"></i>Select Target
+                    </label>
+                    <select id="target" name="target" class="form-control">
+                        {% for target in targets %}
+                            <option value="{{ target.id }}">{{ target.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>                
+                <div class="form-group">
+                    <label class="font-weight-bold" for="id_input_type">
+                        <i class="fas fa-pencil-alt mr-2"></i>Compound Input Method
+                    </label>
+                    <select class="form-control custom-select" name="input_type" id="id_input_type" required>
+                        <option value="SMILES">SMILES Notation</option>
+                        <option value="jsme_drawn">JSME Chemical Drawing</option>
+                        <option value="PDB">PDB File Upload</option>
+                        <option value="sequence">Biomolecule Sequence</option>
+                    </select>
+                </div>
+            
+                <!-- Dynamic Input Sections -->
+                <div class="form-group" id="inputContainer">
+                    <!-- JSME Chemical Drawing -->
+                    <div id="jsme_drawnSection" class="input-section" style="display: none;">
+                        <div class="alert alert-info">
+                            <button type="button" class="btn btn-sm btn-info float-right" id="confirmSmiles">
+                                <i class="fas fa-check"></i> Confirm Structure
+                            </button>
+                            Draw your compound below and confirm when ready
+                        </div>
+                        <div id="jsme_container" class="border rounded p-2 mb-3"></div>
+                        <input type="hidden" name="compound_input" id="jsme_input" required>
+                    </div>
+            
+                    <!-- SMILES Input -->
+                    <div id="SMILESSection" class="input-section" style="display: none;">
+                        <div class="form-group">
+                            <label>SMILES Notation:</label>
+                            <textarea class="form-control" name="compound_input" 
+                                      rows="3" placeholder="CCO Ethanol..." 
+                                      data-validator="smiles" required></textarea>
+                            <div class="invalid-feedback">Please enter a valid SMILES string</div>
+                        </div>
+                    </div>
+            
+                    <!-- PDB File Upload -->
+                    <div id="PDBSection" class="input-section" style="display: none;">
+                        <div class="form-group">
+                            <label>PDB Structure Upload:</label>
+                            <div class="custom-file">
+                                <!-- Note: For file uploads, the data is in request.FILES -->
+                                <input type="file" class="custom-file-input" name="compound_input" 
+                                       id="pdbFile" accept=".pdb" required>
+                                <label class="custom-file-label" for="pdbFile">Choose PDB file</label>
+                            </div>
+                            <small class="form-text text-muted">
+                                Max size: 10MB. We accept standard PDB format only.
+                            </small>
+                        </div>
+                    </div>
+            
+                    <!-- Sequence Input -->
+                    <div id="sequenceSection" class="input-section" style="display: none;">
+                        <div class="form-group">
+                            <label>Biomolecule Sequence:</label>
+                            <textarea class="form-control" name="compound_input" 
+                                      rows="5" placeholder="Enter amino acid/nucleotide sequence..."
+                                      data-validator="sequence" required></textarea>
+                            <small class="form-text text-muted">
+                                Sequences over 30 residues will be processed with AlphaFold2
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="check_similarity" id="check_similarity" value="true">
+                    <label class="form-check-label" for="check_similarity">
+                        Perform Similarity Check
+                    </label>
+                </div>
+                <button type="submit" class="btn btn-primary btn-lg btn-block">
+                    <i class="fas fa-rocket mr-2"></i>Run Screening
+                </button>
+            </form>
+            
+        </div>
+        
+        <!-- Dynamic Input Handling Script -->
+        <script nonce="{{ request.csp_nonce }}">
+        document.addEventListener('DOMContentLoaded', () => {
+            const inputType = document.getElementById('id_input_type');
+            const sections = document.querySelectorAll('.input-section');
+            let jsmeApplet;
+        
+            // Initialize JSME safely
+            function initJSME() {
+                const script = document.createElement('script');
+                script.nonce = "{{ request.csp_nonce }}";
+                script.src = "{% static 'jsme/jsme.nocache.js' %}";
+                script.onload = () => {
+                    jsmeApplet = new JSApplet.JSME("jsme_container", "100%", "400px", {
+                        options: "marker, aromatize"
+                    });
+                };
+                document.head.appendChild(script);
+            }
+            
+            document.getElementById('confirmSmiles')?.addEventListener('click', () => {
+                const smiles = jsmeApplet.smiles();
+                // Set the hidden input value to the captured SMILES string.
+                document.getElementById('jsme_input').value = smiles;
+                alert(`SMILES captured: ${smiles}`);
+            });            
+            
+            // Update visible inputs and disable hidden ones
+            function updateInputView() {
+                const type = inputType.value;
+                sections.forEach(section => {
+                    if (section.id === `${type}Section`) {
+                        section.style.display = 'block';
+                        // Enable inputs in the active section
+                        Array.from(section.querySelectorAll('input, textarea')).forEach(input => {
+                            input.disabled = false;
+                        });
+                    } else {
+                        section.style.display = 'none';
+                        // Disable inputs in inactive sections so they don't submit unwanted data
+                        Array.from(section.querySelectorAll('input, textarea')).forEach(input => {
+                            input.disabled = true;
+                        });
+                    }
+                });
+        
+                // Special handling for JSME initialization
+                if (type === 'jsme_drawn' && !jsmeApplet) {
+                    initJSME();
+                }
+            }
+        
+            // Event handlers
+            inputType.addEventListener('change', updateInputView);
+        
+            // File upload feedback
+            document.getElementById('pdbFile')?.addEventListener('change', function(e) {
+                const fileName = e.target.files[0]?.name || 'Choose file';
+                document.querySelector('.custom-file-label').textContent = fileName;
+            });
+        
+            // Initial setup
+            updateInputView();
+        });
+        </script>        
+
+<style>
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.9);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        z-index: 9999;
     }
-
-    function jsmeOnLoad() {
-      jsmeApplet = new JSApplet.JSME("jsme_container", "1000px", "1000px", {
-        "options": "marker"
-      });
+    .custom-select {
+        border-radius: 0.25rem;
+        transition: border-color 0.15s ease-in-out;
     }
-  </script>
-</head>
-<body>
-  <div id="jsme_container"></div>
-</body>
-</html>
+    #jsme_container {
+        background: white;
+        min-height: 400px;
+    }
+</style>
+{% endblock %}

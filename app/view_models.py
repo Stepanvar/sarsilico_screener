@@ -1,51 +1,5 @@
 # view_models.py
 
-# -- Input Handling --
-def receive_input(request):
-    """
-    Extract target and compound input from the request.
-    Returns:
-        target, raw_compound_input, and input_type.
-    """
-    # Implementation would extract and return data from form or API.
-    pass
-
-
-# -- Conversion Functions --
-def marvin_to_smiles(mrv_data):
-    """
-    Convert a MarvinJS-drawn molecule to SMILES.
-    Tools: MarvinJS adapters, RDKit.
-    """
-    return convert_marvin_data_to_smiles(mrv_data)
-
-
-def peptide_to_smiles(sequence):
-    """
-    Convert a short peptide sequence to SMILES using PepSMI.
-    Tools: PepSMI, AminoAcidAdapter.
-    """
-    return convert_peptide_sequence_to_smiles(sequence)
-
-
-def sequence_to_cif(sequence):
-    """
-    Generate a CIF file from a long biomolecule sequence using AlphaFold.
-    Tools: AlphaFold via Docker.
-    Returns a dict with CIF data or error.
-    """
-    cif_file = run_alphafold(sequence)
-    return {'cif_data': cif_file} if cif_file else {'error': 'AlphaFold conversion failed'}
-
-
-def cif_to_pdb(cif_data):
-    """
-    Convert a CIF file to a PDB file.
-    Tools: mmcif2pdb (CCTBX) or online converter.
-    """
-    return convert_mmcif_to_pdb(cif_data)
-
-
 # -- Validation Functions --
 def validate_input(compound_input, input_type):
     """
@@ -54,34 +8,80 @@ def validate_input(compound_input, input_type):
     # Actual implementation would check SMILES, PDB structure, or sequence format.
     pass
 
-
-# -- Similarity Check Functions --
-def check_similarity(compound_input, input_type):
+def generate_output(target, compound, docking_score, repurposing_info):
     """
-    Generate a molecular fingerprint and perform a TTD similarity search.
+    Generate output details including interactive visualizations and a detailed report.
+    
+    Args:
+        target: A PredefinedProteinTarget instance or identifier.
+        compound: Processed compound data (SMILES, PDB, etc.).
+        docking_score: Affinity score obtained from the docking simulation.
+        repurposing_info: Dictionary containing drug repurposing details, including any similar drug information.
+        
     Returns:
-        similarity_results, repurposing_info.
+        dict: A dictionary structured with output data for rendering in the results view.
     """
-    fingerprint = generate_morgan_fingerprint(compound_input)
-    similarity_results = perform_ttd_similarity_search(fingerprint)
-    repurposing_info = {}
-    return similarity_results, repurposing_info
+    # Build visualization data (e.g., data required for NGL.js)
+    visualization_data = generate_visualization_data(target, compound, docking_score)
+    
+    output = {
+        'target': target.name if hasattr(target, 'name') else target,
+        'compound': compound,
+        'docking_score': docking_score,
+        'repurposing_info': repurposing_info,
+        'visualization_data': visualization_data
+    }
+    
+    return output
 
 
-def lookup_medicine_name(similarity_results):
+def generate_visualization_data(target, compound, docking_score):
     """
-    Check CoviDrug (https://covirus.cc/drugs/) for a matching drug name.
-    Tools: requests, BeautifulSoup.
+    Create data needed for interactive visualization.
+    
+    This function could prepare parameters and structures that
+    an interactive viewer (like NGL.js) would use to render the
+    molecular structures and docking results.
+    
+    Args:
+        target: The target protein data.
+        compound: The processed compound structure.
+        docking_score: The docking affinity score.
+        
+    Returns:
+        dict: Data prepared for visualization (this is a placeholder for real logic).
     """
-    # Pseudocode: query and parse the CoviDrug site based on similarity results.
-    return "ExampleDrugName"  # Placeholder
+    # Pseudocode: Process the target and compound to generate necessary coordinates,
+    # grid parameters, or any metadata needed by the visualization library.
+    visualization = {
+        'target_structure': "processed_target_data",  # Placeholder
+        'compound_structure': "processed_compound_data",  # Placeholder
+        'affinity': docking_score,
+    }
+    
+    return visualization
 
+# conversion.py
+def jsme_to_smiles(jsme_data: str) -> str:
+    """Convert JSME structure data to SMILES string"""
+    return smiles_str
 
-# -- Docking Functions --
-def execute_docking(target, compound_input, input_type):
-    """
-    Prepare inputs (PDBQT conversion, grid configuration) and execute AutoDock Vina.
-    Returns an affinity docking score.
-    """
-    # Conversion to PDBQT, grid setup, and docking execution.
-    pass
+def peptide_to_smiles(sequence: str) -> str:
+    """Convert short peptide sequence to SMILES notation"""
+    return smiles_str
+
+def sequence_to_cif(sequence: str) -> dict:
+    """Convert biomolecule sequence to CIF format"""
+    return {'cif_data': str} or {'error': str}
+
+def cif_to_pdb(cif_data: str) -> str:
+    """Convert CIF format to PDB format"""
+    return pdb_str
+
+def validate_input(data: str, input_type: str) -> bool:
+    """Validate chemical structure format"""
+    return is_valid
+
+def is_short_sequence(sequence: str, threshold=30) -> bool:
+    """Check if sequence length is under threshold"""
+    return len(sequence) <= threshold

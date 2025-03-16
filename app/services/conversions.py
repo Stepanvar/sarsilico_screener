@@ -1,222 +1,143 @@
 # app/services/conversions.py
-"""
-Molecular input conversions implementing insilico.txt section 2 requirements
-Handles: SMILES, PDB, peptide, and biomolecule inputs
-"""
+"""Molecular Conversion Engine - Core Implementation"""
 
-import subprocess
-import re
-from typing import Dict
-from django.conf import settings
+from pathlib import Path
+from xml.dom import ValidationErr
 from rdkit import Chem
-from rdkit.Chem import AllChem, rdDepictor
-from rdkit.Chem import Draw
-from chemistry_adapters import AminoAcidAdapter
+from rdkit.Chem import MolFromSmiles, MolFromSequence
+from Bio.PDB.MMCIFParser import MMCIFParser
+from Bio.PDB.PDBIO import PDBIO
+from io import StringIO
+import subprocess
+import os
+import tempfile
+import time
+
+from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
+
+from inSilicoScreening import settings
+
+def jsme_to_smiles(jsme_data: str) -> str:
+    """Convert JSME data to canonical SMILES"""
+    mol = Chem.MolFromSmiles(jsme_data) or Chem.MolFromMolBlock(jsme_data)
+    if not mol:
+        raise ValidationErr("Invalid JSME input format")
+    return Chem.MolToSmiles(mol, canonical=True, isomericSmiles=True)
+
+def peptide_to_smiles(sequence: str) -> str:
+    """Convert peptide sequence to SMILES using RDKit's amino acid handling"""
+    mol = MolFromSequence(sequence)
+    if not mol:
+        raise ValidationErr("Invalid peptide sequence")
+    return Chem.MolToSmiles(mol)
+
+
 import logging
-
 logger = logging.getLogger(__name__)
-rdDepictor.SetPreferCoordGen(True)  # Better 2D coordinate generation
 
-class ConversionEngine:
+
+def sequence_to_cif(sequence: str) -> dict:
     """
-    Main conversion router for section 2 inputs
-    Implements requirements for:
-    - MarvinJS → SMILES (2a)
-    - Peptide → SMILES (2b)
-    - Biomolecule → PDB via AlphaFold (2c)
-    """
+    Run AlphaFold via Docker for structure prediction.
+    This function writes the sequence to a temporary FASTA file,
+    calls the Dockerized AlphaFold prediction, and attempts to retrieve
+    a generated CIF file.
     
-    def __init__(self):
-        self.aa_adapter = AminoAcidAdapter()
-
-    def marvin_to_smiles(self, mrv_data: str) -> Dict:
-        """
-        Convert MarvinJS sketches to validated SMILES
-        Args:
-            mrv_data: MRV string from MarvinJS
-        Returns: Dict with SMILES and validation data
-        """
-        try:
-            mol = Chem.MolFromMrvBlock(mrv_data)
-            if not mol:
-                return {'error': 'Invalid MRV structure'}
-            
-            Chem.SanitizeMol(mol)
-            smiles = Chem.MolToSmiles(mol, isomericSmiles=True)
-            
-            if not ValidationTools.validate_smiles(smiles):
-                return {'error': 'Invalid SMILES generated'}
-            
-            return {
-                'smiles': smiles,
-                'type': 'small_molecule',
-                'structure_2d': self._generate_2d_svg(mol),
-                'validation': {'valid': True}
-            }
-            
-        except Exception as e:
-            logger.error(f"MarvinJS conversion failed: {str(e)}")
-            return {'error': str(e)}
-
-    def peptide_to_smiles(self, sequence: str) -> Dict:
-        """
-        Convert short peptides (<20aa) to SMILES using PepSMI
-        Args:
-            sequence: Amino acid sequence
-        Returns: Dict with SMILES and validation data
-        """
-        try:
-            clean_seq = re.sub(r'\s+', '', sequence).upper()
-            validation = ValidationTools.validate_peptide(clean_seq)
-            if not validation['valid']:
-                return validation
-                
-            smiles = self.aa_adapter.convert_amino_acid_sequence_to_smiles(clean_seq)
-            
-            if not ValidationTools.validate_smiles(smiles):
-                return {'error': 'Invalid SMILES from peptide'}
-                
-            return {
-                'smiles': smiles,
-                'type': 'peptide',
-                'structure_2d': self._generate_2d_svg(Chem.MolFromSmiles(smiles)),
-                'validation': validation
-            }
-            
-        except Exception as e:
-            logger.error(f"Peptide conversion failed: {str(e)}")
-            return {'error': str(e)}
-
-    def run_alphafold(self, sequence: str) -> Dict:
-        """
-        Generate 3D structure via AlphaFold Docker
-        Args:
-            sequence: Long biomolecule sequence
-        Returns: Dict with CIF data and processing info
-        """
-        try:
-            cmd = [
-                'docker', 'run', '--rm',
-                '-e', f'AF_KEY={settings.ALPHAFOLD_API_KEY}',
-                settings.ALPHAFOLD_DOCKER_IMAGE,
-                '--sequence', sequence,
-                '--output', '/dev/stdout'
-            ]
-            
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=settings.SUBPROCESS_TIMEOUT  
-            )
-            
-            if result.returncode != 0:
-                return {'error': f"AlphaFold error: {result.stderr}"}
-                
-            return {
-                'cif_data': result.stdout,
-                'job_id': f"AF-{hash(sequence)}",
-                'warnings': result.stderr.splitlines()
-            }
-            
-        except subprocess.TimeoutExpired:
-            return {'error': 'AlphaFold processing timed out'}
-        except Exception as e:
-            logger.error(f"AlphaFold failed: {str(e)}")
-            return {'error': str(e)}
-
-    def cif_to_pdb(self, cif_data: str) -> Dict:
-        """
-        Convert CIF to PDB using mmcif2pdb
-        Args:
-            cif_data: CIF format string
-        Returns: Dict with PDB data and validation
-        """
-        try:
-            result = subprocess.run(
-                ['mmcif2pdb', '-'],
-                input=cif_data,
-                capture_output=True,
-                text=True,
-                check=True,
-                timeout=settings.SUBPROCESS_TIMEOUT
-            )
-            
-            validation = ValidationTools.validate_pdb(result.stdout)
-            if not validation['valid']:
-                return {'error': validation.get('error', 'Invalid PDB')}
-            
-            return {
-                'pdb_data': result.stdout,
-                'validation': validation,
-                'warnings': result.stderr.splitlines()
-            }
-            
-        except subprocess.CalledProcessError as e:
-            return {'error': f"Conversion failed: {e.stderr}"}
-        except Exception as e:
-            logger.error(f"CIF conversion failed: {str(e)}")
-            return {'error': str(e)}
-
-    def _generate_2d_svg(self, mol: Chem.Mol) -> str:
-        """Generate 2D structure visualization for UI"""
-        Draw.PrepareMolForDrawing(mol)
-        return Draw.MolToSVG(mol)
-
-class ValidationTools:
+    Returns a dict with keys:
+      - success: bool
+      - message: str
+      - output_dir: str (if successful)
+      - cif_data: str (content of first CIF file found)
+      - stdout, stderr: logs from the prediction run
     """
-    Input validation methods for section 2 requirements
-    Implements checks for:
-    - SMILES validity
-    - PDB quality
-    - Sequence validity
-    """
-    
-    @staticmethod
-    def validate_smiles(smiles: str) -> bool:
-        """Comprehensive SMILES validation using RDKit"""
-        mol = Chem.MolFromSmiles(smiles)
-        return mol is not None and mol.GetNumAtoms() > 0
+    # Check required settings
+    data_dir = getattr(settings, "ALPHAFOLD_DATA_DIR", None)
+    if not data_dir:
+        raise ImproperlyConfigured("ALPHAFOLD_DATA_DIR must be set in settings.")
 
-    @staticmethod
-    def validate_pdb(pdb_content: str) -> Dict:
-        """Validate PDB structure and resolution"""
-        validation = {'valid': True, 'warnings': []}
-        
-        # Resolution check
-        for line in pdb_content.split('\n'):
-            if line.startswith('REMARK   2 RESOLUTION.'):
-                try:
-                    res = float(line.split()[-1])
-                    if res > settings.MAX_PDB_RESOLUTION:
-                        validation.update({
-                            'valid': False,
-                            'error': f"Resolution {res}Å exceeds limit"
-                        })
-                except (IndexError, ValueError):
-                    validation['warnings'].append("Invalid resolution format")
-        
-        # Structural validation
-        mol = Chem.MolFromPDBBlock(pdb_content)
-        if not mol or mol.GetNumAtoms() == 0:
-            validation.update({
-                'valid': False,
-                'error': "Invalid PDB structure"
-            })
-            
-        return validation
+    # Create temporary FASTA file
+    try:
+        fasta_fd, fasta_path = tempfile.mkstemp(suffix=".fasta")
+        with os.fdopen(fasta_fd, "w") as f:
+            f.write(">query\n" + sequence + "\n")
+    except Exception as e:
+        return {"success": False, "message": f"Failed to write FASTA file: {str(e)}"}
 
-    @staticmethod
-    def validate_peptide(sequence: str) -> Dict:
-        """Validate amino acid sequence composition"""
-        if len(sequence) == 0:
-            return {'valid': False, 'error': 'Empty sequence'}
-            
-        if not re.fullmatch(r'^[ACDEFGHIKLMNPQRSTVWY]+$', sequence):
-            invalid = set(sequence) - set("ACDEFGHIKLMNPQRSTVWY")
+    # Create a unique output directory under MEDIA_ROOT
+    output_dir = os.path.join(settings.MEDIA_ROOT, f"alphafold_{int(time.time())}")
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Construct the Docker command.
+    # (Adjust the command as necessary to match your Docker image/entrypoint.)
+    cmd = [
+        "python3", "docker/run_docker.py",
+        f"--fasta_paths={fasta_path}",
+        "--max_template_date=2022-01-01",
+        f"--data_dir={data_dir}",
+        f"--output_dir={output_dir}"
+    ]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        # Look for a CIF file in the output directory (recursively)
+        cif_files = list(Path(output_dir).rglob("*.cif"))
+        if cif_files:
+            cif_file_path = str(cif_files[0])
+            with open(cif_file_path, "r") as cf:
+                cif_data = cf.read()
             return {
-                'valid': False,
-                'error': f"Invalid amino acids: {', '.join(invalid)}"
+                "success": True,
+                "message": "AlphaFold prediction completed successfully",
+                "output_dir": output_dir,
+                "cif_data": cif_data,
+                "stdout": result.stdout,
+                "stderr": result.stderr,
             }
-            
-        return {'valid': True, 'sequence': sequence}
+        else:
+            return {
+                "success": False,
+                "message": "AlphaFold prediction ran but no CIF file was generated",
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+            }
+    except subprocess.CalledProcessError as e:
+        logger.error(f"AlphaFold prediction failed: {e.stderr}")
+        return {
+            "success": False,
+            "message": f"AlphaFold prediction failed: {str(e)}",
+            "stdout": e.stdout,
+            "stderr": e.stderr,
+        }
+    finally:
+        # Clean up the temporary FASTA file
+        if os.path.exists(fasta_path):
+            os.unlink(fasta_path)
+
+def cif_to_pdb(cif_data: str) -> str:
+    """Convert mmCIF to PDB using BioPython's structure parser"""
+    parser = MMCIFParser()
+    with StringIO(cif_data) as cif_file:
+        structure = parser.get_structure('cif_struct', cif_file)
+    pdb_io = StringIO()
+    PDBIO().set_structure(structure)
+    PDBIO().save(pdb_io)
+    return pdb_io.getvalue()
+
+def is_short_sequence(sequence: str, threshold=30) -> bool:
+    """Determine appropriate conversion path"""
+    return len(sequence) <= threshold
+
+def validate_input(data: str, input_type: str) -> bool:
+    """Basic format validation"""
+    try:
+        if input_type == 'SMILES':
+            return bool(MolFromSmiles(data))
+        elif input_type == 'PDB':
+            # Simple header check
+            return data.startswith(('HEADER', 'ATOM'))
+        elif input_type == 'sequence':
+            return data.isalpha()
+        return False
+    except:
+        return False

@@ -2,39 +2,15 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Django Development Server",
+            "name": "Python: Django",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/manage.py",
             "args": [
                 "runserver",
-                "--noreload",
-                "--insecure",
-                "0.0.0.0:8000"
+                "--noreload"
             ],
-            "django": true,
-            "autoReload": {
-                "enable": true,
-                "pollInterval": 1500
-            }
-        },
-        {
-            "name": "Chrome Debugger",
-            "type": "chrome",
-            "request": "launch",
-            "url": "http://localhost:8000",
-            "webRoot": "${workspaceFolder}",
-            "sourceMaps": true,
-            "runtimeArgs": [
-                "--remote-debugging-port=9222",
-                "--auto-open-devtools"
-            ]
-        }
-    ],
-    "compounds": [
-        {
-            "name": "Full Stack Debug",
-            "configurations": ["Django Development Server", "Chrome Debugger"]
+            "django": true
         }
     ]
 }

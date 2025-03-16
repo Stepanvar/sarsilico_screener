@@ -1,259 +1,177 @@
 # app/services/docking.py
 """
-AutoDock Vina integration implementing insilico.txt section 4 requirements
-Handles docking preparation, execution, and result processing
+Complete molecular docking implementation with integrated functionality
 """
 
 import logging
+import os
 import subprocess
+import tempfile
+import shutil
 from pathlib import Path
 from typing import Dict, List
 from django.conf import settings
 from rdkit import Chem
 from rdkit.Chem import AllChem, rdDistGeom, rdForceFieldHelpers
 from MDAnalysis import Universe
-import tempfile
-import shutil
+from app.models import PredefinedProteinTarget, ScreeningJob
 
 logger = logging.getLogger(__name__)
 
-class DockingEngine:
-    """Handles complete docking workflow from preparation to execution"""
+def execute_docking(target: PredefinedProteinTarget, compound_data: str, input_type: str) -> dict:
+    """
+    Run molecular docking using AutoDock Vina.
     
-    def __init__(self, target_pdb: str, compound_data: Dict):
-        self.target_pdb = Path(target_pdb).resolve()
-        self.compound_data = compound_data
-        self.work_dir = Path(tempfile.mkdtemp(dir=settings.MEDIA_ROOT))
-        self.receptor_pdbqt = self.work_dir / 'receptor.pdbqt'
-        self.ligand_pdbqt = self.work_dir / 'ligand.pdbqt'
+    This function prepares the receptor and ligand files based on the provided
+    ScreeningJob and compound_data (which may be SMILES or a PDB string), configures
+    docking parameters, executes Vina, and parses the results.
+    
+    Returns a dict with keys:
+      - success: bool
+      - message: str
+      - best_affinity: float (if docking is successful)
+      - output_file: str (path to the docking output file)
+      - stdout, stderr: logs from the docking run
+    """
+    from rdkit import Chem
+    from rdkit.Chem import AllChem, rdDistGeom, rdForceFieldHelpers
+    # Importing MDAnalysis for docking configuration
+    try:
+        from MDAnalysis import Universe
+    except ImportError:
+        logger.error("MDAnalysis is required for docking configuration.")
+        return {"success": False, "message": "MDAnalysis package not found."}
 
-    def __enter__(self):
-        return self
+    # Create a temporary working directory under MEDIA_ROOT
+    work_dir = Path(tempfile.mkdtemp(dir=settings.MEDIA_ROOT))
+    try:
+        # Validate target structure file existence
+        target_pdb_path = work_dir / "pdb_files" / target.pdb_file.path
+        if not target_pdb_path.exists():
+            raise ValueError(f"Target PDB file not found: {target.name}")
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Cleanup temporary files"""
-        if not settings.DEBUG:
-            shutil.rmtree(self.work_dir, ignore_errors=True)
-
-    def prepare_receptor(self) -> str:
-        """Convert target PDB to PDBQT using AutoDockTools"""
+        # --- Prepare Receptor ---
+        receptor_pdbqt = work_dir / "receptor.pdbqt"
         try:
-            if not self.target_pdb.exists():
-                raise FileNotFoundError(f"Target PDB not found: {self.target_pdb}")
-            
-            cmd = [
-                'prepare_receptor4.py',
-                '-r', str(self.target_pdb),
-                '-o', str(self.receptor_pdbqt),
-                '-A', 'checkhydrogens'
-            ]
-            
-            result = subprocess.run(
-                cmd,
-                check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True
-            )
-            logger.debug(f"Receptor prepared: {result.stdout}")
-            return str(self.receptor_pdbqt)
-            
+            subprocess.run([
+                "prepare_receptor4.py",
+                "-r", str(target_pdb_path),
+                "-o", str(receptor_pdbqt),
+                "-A", "checkhydrogens"
+            ], check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
-            logger.error(f"Receptor prep failed: {e.stdout}")
+            logger.error(f"Receptor preparation failed: {e.stdout.decode()}")
             raise ValueError("Receptor preparation error") from e
 
-    def prepare_ligand(self) -> str:
-        """Prepare ligand PDBQT from various input types"""
-        try:
-            if self.compound_data['type'] == 'SMILES':
-                return self._process_smiles(self.compound_data['data'])
-            return self._process_pdb(self.compound_data['data'])
-        except KeyError as e:
-            logger.error(f"Invalid compound data: {str(e)}")
-            raise ValueError("Invalid ligand input format") from e
 
-    def _process_smiles(self, smiles: str) -> str:
-        """Convert SMILES to 3D PDBQT via RDKit and OBabel"""
-        try:
-            # Generate 3D structure with RDKit
-            mol = Chem.MolFromSmiles(smiles)
-            if not mol:
-                raise ValueError("Invalid SMILES structure")
-                
-            mol = Chem.AddHs(mol)
-            rdDistGeom.EmbedMolecule(mol)
-            rdForceFieldHelpers.MMFFOptimizeMolecule(mol)
-            
-            # Save temporary PDB
-            temp_pdb = self.work_dir / 'ligand.pdb'
-            Chem.MolToPDBFile(mol, str(temp_pdb))
-            
-            # Convert to PDBQT
-            return self._convert_to_pdbqt(temp_pdb)
-            
-        except Exception as e:
-            logger.error(f"SMILES processing failed: {str(e)}")
-            raise
+        # --- Prepare Ligand ---
+        ligand_pdbqt = work_dir / "ligand.pdbqt"
+        if input_type.upper() == "SMILES":
+            try:
+                # Generate 3D structure from SMILES using RDKit
+                mol = Chem.MolFromSmiles(compound_data)
+                if not mol:
+                    raise ValueError("Invalid SMILES string provided.")
+                mol = Chem.AddHs(mol)
+                rdDistGeom.EmbedMolecule(mol)
+                rdForceFieldHelpers.MMFFOptimizeMolecule(mol)
 
-    def _process_pdb(self, pdb_path: str) -> str:
-        """Convert PDB to PDBQT using AutoDockTools"""
-        try:
-            input_pdb = Path(pdb_path).resolve()
-            if not input_pdb.exists():
-                raise FileNotFoundError(f"Ligand PDB not found: {input_pdb}")
-                
-            return self._convert_to_pdbqt(input_pdb)
-        except Exception as e:
-            logger.error(f"PDB processing failed: {str(e)}")
-            raise
+                # Write temporary PDB file
+                temp_pdb = work_dir / "ligand.pdb"
+                Chem.MolToPDBFile(mol, str(temp_pdb))
 
-    def _convert_to_pdbqt(self, pdb_path: Path) -> str:
-        """Generic PDB to PDBQT conversion"""
-        cmd = [
-            'prepare_ligand4.py',
-            '-l', str(pdb_path),
-            '-o', str(self.ligand_pdbqt),
-            '-A', 'hydrogens'
-        ]
-        
-        try:
-            result = subprocess.run(
-                cmd,
-                check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True
-            )
-            logger.debug(f"Ligand converted: {result.stdout}")
-            return str(self.ligand_pdbqt)
-            
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Ligand conversion failed: {e.stdout}")
-            raise ValueError("Ligand preparation error") from e
+                # Convert PDB to PDBQT using prepare_ligand4.py
+                subprocess.run([
+                    "prepare_ligand4.py",
+                    "-l", str(temp_pdb),
+                    "-o", str(ligand_pdbqt),
+                    "-A", "hydrogens"
+                ], check=True)
+            except Exception as e:
+                logger.error(f"Ligand SMILES processing failed: {str(e)}")
+                raise ValueError("Ligand preparation error (SMILES)") from e
 
-    def configure_docking(self) -> Dict:
-        """Generate docking parameters from target structure"""
+        elif input_type.upper() == "PDB":
+            try:
+                subprocess.run([
+                    "prepare_ligand4.py",
+                    "-l", compound_data,
+                    "-o", str(ligand_pdbqt),
+                    "-A", "hydrogens"
+                ], check=True)
+            except subprocess.CalledProcessError as e:
+                logger.error(f"Ligand PDB conversion failed: {e.stdout.decode()}")
+                raise ValueError("Ligand preparation error (PDB)") from e
+        else:
+            raise ValueError(f"Unsupported input type: {input_type}")
+
+        # --- Configure Docking ---
         try:
-            u = Universe(str(self.target_pdb))
+            # Use MDAnalysis to compute the centroid of the protein
+            u = Universe(str(target_pdb_path))
             protein = u.select_atoms("protein")
             centroid = protein.centroid()
-            
-            return {
-                'center': centroid.tolist(),
-                'box_size': settings.VINA_BOX_SIZE,
-                'exhaustiveness': settings.VINA_EXHAUSTIVENESS,
-                'cpu': settings.VINA_CPU_CORES,
-                'num_poses': settings.VINA_NUM_POSES
+            config = {
+                "center": centroid.tolist(),
+                "box_size": settings.VINA_BOX_SIZE,
+                "exhaustiveness": settings.VINA_EXHAUSTIVENESS,
+                "cpu": settings.VINA_CPU_CORES,
+                "num_poses": settings.VINA_NUM_POSES
             }
         except Exception as e:
-            logger.error(f"Docking config failed: {str(e)}")
-            raise
+            logger.error(f"Docking configuration failed: {str(e)}")
+            raise ValueError("Docking configuration error") from e
 
-    def run_docking(self) -> Dict:
-        """Execute AutoDock Vina and return results"""
+        # --- Execute Docking with AutoDock Vina ---
+        output_pdbqt = work_dir / "docking_out.pdbqt"
         try:
-            config = self.configure_docking()
-            
-            cmd = [
-                'vina',
-                '--receptor', str(self.receptor_pdbqt),
-                '--ligand', str(self.ligand_pdbqt),
-                '--center_x', str(config['center'][0]),
-                '--center_y', str(config['center'][1]),
-                '--center_z', str(config['center'][2]),
-                '--size_x', str(config['box_size'][0]),
-                '--size_y', str(config['box_size'][1]),
-                '--size_z', str(config['box_size'][2]),
-                '--exhaustiveness', str(config['exhaustiveness']),
-                '--cpu', str(config['cpu']),
-                '--num_modes', str(config['num_poses'])
+            vina_cmd = [
+                "vina",
+                "--receptor", str(receptor_pdbqt),
+                "--ligand", str(ligand_pdbqt),
+                "--center_x", str(config["center"][0]),
+                "--center_y", str(config["center"][1]),
+                "--center_z", str(config["center"][2]),
+                "--size_x", str(config["box_size"][0]),
+                "--size_y", str(config["box_size"][1]),
+                "--size_z", str(config["box_size"][2]),
+                "--exhaustiveness", str(config["exhaustiveness"]),
+                "--cpu", str(config["cpu"]),
+                "--num_modes", str(config["num_poses"]),
+                "--out", str(output_pdbqt)
             ]
-            
-            result = subprocess.run(
-                cmd,
-                check=True,
-                capture_output=True,
-                text=True
-            )
-            
-            return DockingResultsParser.parse_vina_output(result.stdout)
-            
+            result = subprocess.run(vina_cmd, capture_output=True, text=True, check=True)
         except subprocess.CalledProcessError as e:
-            logger.error(f"Docking failed: {e.stderr}")
+            logger.error(f"Docking execution failed: {e.stderr}")
             raise ValueError("Docking execution error") from e
 
-class DockingResultsParser:
-    """Processes and formats raw Vina output"""
-    
-    @staticmethod
-    def parse_vina_output(output: str) -> Dict:
-        """Extract docking results from Vina stdout"""
-        try:
-            lines = output.split('\n')
-            modes: List[Dict] = []
-            current_mode: Dict = {}
+        # --- Parse Vina Output ---
+        best_affinity = None
+        for line in result.stdout.splitlines():
+            if line.startswith("REMARK VINA RESULT:"):
+                parts = line.split()
+                if len(parts) >= 4:
+                    current_affinity = float(parts[3])
+                    if best_affinity is None or current_affinity < best_affinity:
+                        best_affinity = current_affinity
 
-            for line in lines:
-                if '-----+' in line:  # Table header
-                    continue
-                if line.startswith('MODEL'):
-                    current_mode = {
-                        'model_id': int(line.split()[1]),
-                        'pose': [],
-                        'affinity': 0.0,
-                        'rmsd_lower': 0.0,
-                        'rmsd_upper': 0.0
-                    }
-                elif line.startswith('ENDMDL'):
-                    modes.append(current_mode)
-                elif line.startswith('REMARK VINA RESULT:'):
-                    parts = line.split()
-                    current_mode.update({
-                        'affinity': float(parts[3]),
-                        'rmsd_lower': float(parts[4]),
-                        'rmsd_upper': float(parts[5])
-                    })
-                elif line.startswith('ATOM') or line.startswith('HETATM'):
-                    current_mode['pose'].append(line)  # Now properly typed as list
-            
-            return {
-                'poses': modes,
-                'best_affinity': min(m['affinity'] for m in modes) if modes else None,
-                'raw_output': output
-            }
-        except Exception as e:
-            logger.error(f"Result parsing failed: {str(e)}")
-            raise
+        if best_affinity is None:
+            raise ValueError("No valid docking results found in Vina output.")
 
+        # Optionally, copy the output file to a permanent location
+        final_output = os.path.join(settings.MEDIA_ROOT, f"docking_result_{os.path.basename(str(target.name))}.pdbqt")
+        subprocess.run(f"cp {output_pdbqt} {final_output}", shell=True, check=True)
 
-    @staticmethod
-    def generate_report(raw_results: Dict) -> Dict:
-        """Create comprehensive docking report"""
         return {
-            'summary': {
-                'best_affinity': raw_results['best_affinity'],
-                'total_poses': len(raw_results['poses']),
-                'mean_affinity': sum(p['affinity'] for p in raw_results['poses']) / len(raw_results['poses'])
-            },
-            'visualization': {
-                'complex_pdb': DockingResultsParser._generate_complex_pdb(raw_results),
-                'interactions': DockingResultsParser._analyze_interactions(raw_results)
-            },
-            'raw_data': raw_results
+            "success": True,
+            "message": "Docking completed successfully",
+            "best_affinity": best_affinity,
+            "output_file": final_output,
+            "stdout": result.stdout,
         }
-
-    @staticmethod
-    def _generate_complex_pdb(results: Dict) -> str:
-        """Generate receptor-ligand complex structure"""
-        try:
-            # In production, implement proper complex generation
-            return "\n".join(results['poses'][0]['pose'])
-        except Exception as e:
-            logger.error(f"Complex generation failed: {str(e)}")
-            return ""
-
-    @staticmethod
-    def _analyze_interactions(results: Dict) -> List[str]:
-        """Analyze ligand-protein interactions"""
-        # Implement actual interaction analysis
-        return ["Hydrogen bond: Atom1-Atom2", "Hydrophobic: ResidueX"]
+    except Exception as exc:
+        return {"success": False, "message": str(exc)}
+    finally:
+        # Clean up working directory unless in DEBUG mode
+        if not settings.DEBUG:
+            shutil.rmtree(work_dir, ignore_errors=True)

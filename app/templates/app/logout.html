@@ -1,0 +1,22 @@
+<!-- logout.html -->
+{% extends 'app/base.html' %}
+{% block title %}Logged Out - SARS-CoV-2 Research Platform{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 text-center">
+            <div class="card shadow">
+                <div class="card-body">
+                    <h2 class="card-title mb-4">Successfully Logged Out</h2>
+                    <p class="lead">You have been successfully logged out.</p>
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'login' %}" class="btn btn-primary">Log Back In</a>
+                        <a href="{% url 'home' %}" class="btn btn-outline-secondary">Return Home</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

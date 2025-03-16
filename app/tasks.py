@@ -10,7 +10,7 @@ from .services.conversions import (
     ValidationTools,
 )
 from .services.docking import DockingEngine, DockingResultsParser
-from .services.similarity_checker import SimilarityChecker
+from .services.similarity_check import SimilarityChecker
 import logging
 import subprocess
 import json

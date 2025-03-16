@@ -1,6 +1,6 @@
 from django.contrib import admin
-from app.models import Target, Compound, KnownDrug
+from app.models import PredefinedProteinTarget, Compound, ScreeningJob
 
-admin.site.register(Target)
+admin.site.register(PredefinedProteinTarget)
 admin.site.register(Compound)
-admin.site.register(KnownDrug)
+admin.site.register(ScreeningJob)
