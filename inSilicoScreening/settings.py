@@ -4,9 +4,7 @@ from pathlib import Path
 import os
 from pathlib import Path
 import posixpath
-from decouple import config
-from sqlalchemy import false
-from celery.schedules import crontab
+
 # Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -49,7 +47,6 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django_bootstrap5',
-    'csp',
     'app',  # Main application
 ]
 
@@ -70,7 +67,6 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'csp.middleware.CSPMiddleware',
 ]
 
 ROOT_URLCONF = 'inSilicoScreening.urls'
@@ -98,6 +94,7 @@ CELERY_RESULT_SERIALIZER = 'json'
 CORS_ALLOWED_ORIGINS = [
 ]
 CSRF_TRUSTED_ORIGINS = [
+    'http://10.2.0.32:8001',
     'http://127.0.0.1:8000',
     'http://127.0.0.1:80',
     'http://10.2.0.32:8000',
@@ -204,15 +201,30 @@ AUTH_USER_MODEL = 'auth.User'  # Explicitly define user model
 
 # Other settings as needed (e.g., ALPHAFOLD_DOCKER_IMAGE, SUBPROCESS_TIMEOUT, etc.)
 # settings.py
-CSP_DEFAULT_SRC = ("'self'", "'unsafe-inline'", "'unsafe-eval'",    # Needed for JSME's code generation
-    "'strict-dynamic'")
-# settings.py
-CSP_STYLE_SRC = ("'self'", "https://cdn.jsdelivr.net")
-CSP_STYLE_SRC_ELEM = ("'self'", "https://cdn.jsdelivr.net")
-CSP_SCRIPT_SRC = [
-    "'self'",
-    "'unsafe-inline'",  # Required for JSME's GWT internals
-    "'unsafe-eval'",    # Needed for JSME's code generation
-    "'strict-dynamic'"  # Allows nonce-propagation
-]
-CSP_INCLUDE_NONCE_IN = ['script-src']
+
+# CSP_FONT_SRC = ("'self'", "https://cdnjs.cloudflare.com")
+# CSP_IMG_SRC = ("'self'", "data:")
+# CSP_CONNECT_SRC = ("'self'", "https://covirus.cc", "https://api.pharmadb.org")
+
+# CSP_DEFAULT_SRC = ("'self'", "'unsafe-inline'", "'unsafe-eval'",    # Needed for JSME's code generation
+#     "'strict-dynamic'")
+# # settings.py
+# CSP_STYLE_SRC_ELEM = ("'self'", "https://cdn.jsdelivr.net")
+# CSP_SCRIPT_SRC = [
+#     "'self'",
+#     "https://cdn.jsdelivr.net",
+#     "https://yastatic.net",  # Add Yandex CDN
+#     "'strict-dynamic'",
+#     "'nonce-{{ request.csp_nonce }}'"  # Use Django's nonce
+# ]
+
+# CSP_STYLE_SRC = [
+#     "'self'",
+#     "https://cdn.jsdelivr.net",
+#     "https://cdnjs.cloudflare.com",
+#     "'unsafe-inline'"  # Required for Bootstrap/jQuery inline styles
+# ]
+
+# CSP_INCLUDE_NONCE_IN = ['script-src']
+# # settings.py
+STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'

@@ -1,6 +1,6 @@
 # app/services/docking.py
 """
-Complete molecular docking implementation with integrated functionality
+Complete molecular docking implementation with integrated functionality using Meeko.
 """
 
 import logging
@@ -20,22 +20,18 @@ logger = logging.getLogger(__name__)
 
 def execute_docking(target: PredefinedProteinTarget, compound_data: str, input_type: str) -> dict:
     """
-    Run molecular docking using AutoDock Vina.
+    Run molecular docking using AutoDock Vina with receptor and ligand preparation via Meeko.
     
-    This function prepares the receptor and ligand files based on the provided
-    ScreeningJob and compound_data (which may be SMILES or a PDB string), configures
-    docking parameters, executes Vina, and parses the results.
+    The function prepares receptor and ligand files using Meeko's scripts (mk_prepare_receptor.py and mk_prepare_ligand.py),
+    configures docking parameters using MDAnalysis, executes Vina, and finally exports the results using mk_export.py.
     
     Returns a dict with keys:
       - success: bool
       - message: str
       - best_affinity: float (if docking is successful)
       - output_file: str (path to the docking output file)
-      - stdout, stderr: logs from the docking run
+      - stdout: logs from the docking run
     """
-    from rdkit import Chem
-    from rdkit.Chem import AllChem, rdDistGeom, rdForceFieldHelpers
-    # Importing MDAnalysis for docking configuration
     try:
         from MDAnalysis import Universe
     except ImportError:
@@ -45,26 +41,24 @@ def execute_docking(target: PredefinedProteinTarget, compound_data: str, input_t
     # Create a temporary working directory under MEDIA_ROOT
     work_dir = Path(tempfile.mkdtemp(dir=settings.MEDIA_ROOT))
     try:
-        # Validate target structure file existence
+        # Validate target structure file existence.
         target_pdb_path = work_dir / "pdb_files" / target.pdb_file.path
         if not target_pdb_path.exists():
             raise ValueError(f"Target PDB file not found: {target.name}")
 
-        # --- Prepare Receptor ---
+        # --- Prepare Receptor using Meeko ---
         receptor_pdbqt = work_dir / "receptor.pdbqt"
         try:
             subprocess.run([
-                "prepare_receptor4.py",
-                "-r", str(target_pdb_path),
-                "-o", str(receptor_pdbqt),
-                "-A", "checkhydrogens"
+                "mk_prepare_receptor.py",
+                "--read_pdb", str(target_pdb_path),
+                "--write_pdbqt", str(receptor_pdbqt)
             ], check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
             logger.error(f"Receptor preparation failed: {e.stdout.decode()}")
             raise ValueError("Receptor preparation error") from e
 
-
-        # --- Prepare Ligand ---
+        # --- Prepare Ligand using Meeko ---
         ligand_pdbqt = work_dir / "ligand.pdbqt"
         if input_type.upper() == "SMILES":
             try:
@@ -80,12 +74,11 @@ def execute_docking(target: PredefinedProteinTarget, compound_data: str, input_t
                 temp_pdb = work_dir / "ligand.pdb"
                 Chem.MolToPDBFile(mol, str(temp_pdb))
 
-                # Convert PDB to PDBQT using prepare_ligand4.py
+                # Convert PDB to PDBQT using Meeko's ligand preparation script
                 subprocess.run([
-                    "prepare_ligand4.py",
-                    "-l", str(temp_pdb),
-                    "-o", str(ligand_pdbqt),
-                    "-A", "hydrogens"
+                    "mk_prepare_ligand.py",
+                    "-i", str(temp_pdb),
+                    "-o", str(ligand_pdbqt)
                 ], check=True)
             except Exception as e:
                 logger.error(f"Ligand SMILES processing failed: {str(e)}")
@@ -94,10 +87,9 @@ def execute_docking(target: PredefinedProteinTarget, compound_data: str, input_t
         elif input_type.upper() == "PDB":
             try:
                 subprocess.run([
-                    "prepare_ligand4.py",
-                    "-l", compound_data,
-                    "-o", str(ligand_pdbqt),
-                    "-A", "hydrogens"
+                    "mk_prepare_ligand.py",
+                    "-i", compound_data,
+                    "-o", str(ligand_pdbqt)
                 ], check=True)
             except subprocess.CalledProcessError as e:
                 logger.error(f"Ligand PDB conversion failed: {e.stdout.decode()}")
@@ -158,15 +150,28 @@ def execute_docking(target: PredefinedProteinTarget, compound_data: str, input_t
         if best_affinity is None:
             raise ValueError("No valid docking results found in Vina output.")
 
+        # --- Export Final Results using Meeko ---
+        # Here we use mk_export.py to generate the final output file.
+        final_output = work_dir / "final_docking_result.pdbqt"
+        try:
+            subprocess.run([
+                "mk_export.py",
+                "-p", str(final_output),
+                str(output_pdbqt)
+            ], check=True)
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Exporting docking result failed: {e.stdout.decode()}")
+            raise ValueError("Docking export error") from e
+
         # Optionally, copy the output file to a permanent location
-        final_output = os.path.join(settings.MEDIA_ROOT, f"docking_result_{os.path.basename(str(target.name))}.pdbqt")
-        subprocess.run(f"cp {output_pdbqt} {final_output}", shell=True, check=True)
+        permanent_output = os.path.join(settings.MEDIA_ROOT, f"docking_result_{os.path.basename(str(target.name))}.pdbqt")
+        subprocess.run(f"cp {final_output} {permanent_output}", shell=True, check=True)
 
         return {
             "success": True,
             "message": "Docking completed successfully",
             "best_affinity": best_affinity,
-            "output_file": final_output,
+            "output_file": permanent_output,
             "stdout": result.stdout,
         }
     except Exception as exc:

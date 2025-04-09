@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>SARSilico Screener - </title>
+        
+        
+        <!-- CSS Files -->
+        <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+        <link rel="stylesheet" href="/static/css/all.min.css">  <!-- Font Awesome -->
+        <link rel="stylesheet" href="/static/css/site.css">
+
+        <!-- JS Files (with proper dependency order) -->
+        <script src="/static/js/jquery-3.6.0.min.js" defer></script>
+        <script src="/static/js/bootstrap.bundle.min.js" defer></script>
+        <script src="/static/js/promise-1.0.0.min.js" defer></script>
+        <script src="/static/js/ngl.js" defer></script>
+    
+
+
+</head>
+
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="/">
+        <span class="fw-bold">SARSilico Screener</span>
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent" 
+              aria-controls="navbarContent" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarContent">
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0 d-flex flex-row">
+          <li class="nav-item">
+            <a class="nav-link active" 
+               href="/">
+              <i class="fas fa-home me-1"></i>Home
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link " 
+               href="#">
+              <i class="fas fa-chart-bar me-1"></i>Results
+            </a>
+          </li>
+        </ul>
+        
+          <ul class="navbar-nav d-flex flex-row">
+            <li class="nav-item">
+              <a class="nav-link" href="/login/"><i class="fas fa-sign-in-alt me-1"></i>Login</a>
+            </li>
+            <li class="nav-item ms-2">
+              <a class="nav-link" href="/register/"><i class="fas fa-user-plus me-1"></i>Register</a>
+            </li>
+          </ul>
+        
+      </div>
+    </div>
+  </nav>
+  
+    
+    <main class="container-fluid mt-4">
+        
+<div class="container">
+    <div class="card shadow-lg">
+        <div class="card-header bg-primary text-white">
+            <h2 class="mb-0"><i class="fas fa-virus mr-2"></i>SARS-CoV-2 Drug Screening Pipeline</h2>
+        </div>
+        
+        <div class="card-body">
+            
+
+            <form method="post" enctype="multipart/form-data" id="screeningForm" action="/">
+                <input type="hidden" name="csrfmiddlewaretoken" value="0O7Jc497KV08lbEJHrrWD330iUxeGaYamj2hglvJeX8OWbyxreVgOT7V1CwKYrq0">
+                
+                <!-- Target Selection -->
+                <div class="form-group">
+                    <label class="font-weight-bold" for="target">
+                        <i class="fas fa-database mr-2"></i>Select Target
+                    </label>
+                    <select id="target" name="target" class="form-control">
+                        
+                            <option value="25">WT_7K7P</option>
+                        
+                            <option value="26">FULL_LENGTH_7MSW</option>
+                        
+                            <option value="27">N_TERMINAL_7EXM</option>
+                        
+                            <option value="28">Nsp3</option>
+                        
+                            <option value="29">WT_7B62</option>
+                        
+                            <option value="30">TRIMER_7COT</option>
+                        
+                            <option value="31">CLOSE_STATE_6ZGE</option>
+                        
+                            <option value="32">OPEN_STATE_6VYB</option>
+                        
+                            <option value="33">WT_6M0J</option>
+                        
+                            <option value="34">DIMER_6Z4U</option>
+                        
+                            <option value="35">DIMER_7JX6</option>
+                        
+                            <option value="36">ECTODOMAIN_7CI3</option>
+                        
+                            <option value="37">DIMER_7KJR</option>
+                        
+                            <option value="38">HEXAMER_7N06</option>
+                        
+                            <option value="39">MONOMER_6VWW</option>
+                        
+                            <option value="40">7k1l</option>
+                        
+                            <option value="41">AMP_PNP_7NN0</option>
+                        
+                            <option value="42">APO_FORM_7NIO</option>
+                        
+                            <option value="43">5rml</option>
+                        
+                            <option value="44">7nn0</option>
+                        
+                            <option value="45">Nsp16-10</option>
+                        
+                            <option value="46">7n0d</option>
+                        
+                            <option value="47">WT_6ZPE</option>
+                        
+                            <option value="48">7oru</option>
+                        
+                            <option value="49">7orr</option>
+                        
+                            <option value="50">7N3K</option>
+                        
+                            <option value="51">7KRI</option>
+                        
+                            <option value="52">WITHOUT_RNA_7D4F</option>
+                        
+                            <option value="53">WITH_RNA_7BV2</option>
+                        
+                            <option value="54">Nsp6</option>
+                        
+                            <option value="55">WT_7SI9</option>
+                        
+                            <option value="56">C111S_7SQE</option>
+                        
+                            <option value="57">WT_7RZC</option>
+                        
+                            <option value="58">Y3_DOMAIN_7RQG</option>
+                        
+                            <option value="59">NAB_7LGO</option>
+                        
+                            <option value="60">UBL1_7KAG</option>
+                        
+                            <option value="61">MACRODOMAIN_5RSF</option>
+                        
+                            <option value="62">ACE2</option>
+                        
+                            <option value="63">Npro</option>
+                        
+                            <option value="64">MODEL</option>
+                        
+                            <option value="65">KAPPA_VARIANT_7SOD</option>
+                        
+                            <option value="66">Nsp9 (state1)</option>
+                        
+                            <option value="67">N-protein-FULL_LENGTH(8FD5) </option>
+                        
+                            <option value="68">N-protein-C-TERMINAL MONOMER(6YUN)</option>
+                        
+                            <option value="69">N-Protein-N-TERMINAL(6yi3) </option>
+                        
+                            <option value="70">Membrane Protein-WT(8CTK)</option>
+                        
+                            <option value="71">Nsp10-16-Nsp16(6WVN)</option>
+                        
+                            <option value="72">Nsp10-16-COMPLEX(6WVN)</option>
+                        
+                            <option value="73">NSP10-14-NSP14(7N0D)</option>
+                        
+                            <option value="74">NSP10-14-COMPLEX(7N0D)</option>
+                        
+                            <option value="75">Nsp9 (state2) </option>
+                        
+                    </select>
+                </div>                
+                <div class="form-group">
+                    <label class="font-weight-bold" for="id_input_type">
+                        <i class="fas fa-pencil-alt mr-2"></i>Compound Input Method
+                    </label>
+                    <select class="form-control custom-select" name="input_type" id="id_input_type" required>
+                        <option value="SMILES">SMILES Notation</option>
+                        <option value="jsme_drawn">JSME Chemical Drawing</option>
+                        <option value="PDB">PDB File Upload</option>
+                        <option value="sequence">Biomolecule Sequence</option>
+                    </select>
+                </div>
+            
+                <!-- Dynamic Input Sections -->
+                <div class="form-group" id="inputContainer">
+                    <!-- JSME Chemical Drawing -->
+                    <div id="jsme_drawnSection" class="input-section" style="display: none;">
+                        <div class="alert alert-info">
+                            <button type="button" class="btn btn-sm btn-info float-right" id="confirmSmiles">
+                                <i class="fas fa-check"></i> Confirm Structure
+                            </button>
+                            Draw your compound below and confirm when ready
+                        </div>
+                        <div id="jsme_container" class="border rounded p-2 mb-3"></div>
+                        <input type="hidden" name="compound_input" id="jsme_input" required>
+                    </div>
+            
+                    <!-- SMILES Input -->
+                    <div id="SMILESSection" class="input-section" style="display: none;">
+                        <div class="form-group">
+                            <label>SMILES Notation:</label>
+                            <textarea class="form-control" name="compound_input" 
+                                      rows="3" placeholder="CCO Ethanol..." 
+                                      data-validator="smiles" required></textarea>
+                            <div class="invalid-feedback">Please enter a valid SMILES string</div>
+                        </div>
+                    </div>
+            
+                    <!-- PDB File Upload -->
+                    <div id="PDBSection" class="input-section" style="display: none;">
+                        <div class="form-group">
+                            <label>PDB Structure Upload:</label>
+                            <div class="custom-file">
+                                <!-- Note: For file uploads, the data is in request.FILES -->
+                                <input type="file" class="custom-file-input" name="compound_input" 
+                                       id="pdbFile" accept=".pdb" required>
+                                <label class="custom-file-label" for="pdbFile">Choose PDB file</label>
+                            </div>
+                            <small class="form-text text-muted">
+                                Max size: 10MB. We accept standard PDB format only.
+                            </small>
+                        </div>
+                    </div>
+            
+                    <!-- Sequence Input -->
+                    <div id="sequenceSection" class="input-section" style="display: none;">
+                        <div class="form-group">
+                            <label>Biomolecule Sequence:</label>
+                            <textarea class="form-control" name="compound_input" 
+                                      rows="5" placeholder="Enter amino acid/nucleotide sequence..."
+                                      data-validator="sequence" required></textarea>
+                            <small class="form-text text-muted">
+                                Sequences over 30 residues will be processed with AlphaFold2
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="check_similarity" id="check_similarity" value="true">
+                    <label class="form-check-label" for="check_similarity">
+                        Perform Similarity Check
+                    </label>
+                </div>
+                <button type="submit" class="btn btn-primary btn-lg btn-block">
+                    <i class="fas fa-rocket mr-2"></i>Run Screening
+                </button>
+            </form>
+            
+        </div>
+        
+        <!-- Dynamic Input Handling Script -->
+        <script nonce="">
+        document.addEventListener('DOMContentLoaded', () => {
+            const inputType = document.getElementById('id_input_type');
+            const sections = document.querySelectorAll('.input-section');
+            let jsmeApplet;
+        
+            // Initialize JSME safely
+            function initJSME() {
+                const script = document.createElement('script');
+                script.nonce = "";
+                script.src = "/static/jsme/jsme.nocache.js";
+                script.onload = () => {
+                    jsmeApplet = new JSApplet.JSME("jsme_container", "100%", "400px", {
+                        options: "marker, aromatize"
+                    });
+                };
+                document.head.appendChild(script);
+            }
+            
+            document.getElementById('confirmSmiles')?.addEventListener('click', () => {
+                const smiles = jsmeApplet.smiles();
+                // Set the hidden input value to the captured SMILES string.
+                document.getElementById('jsme_input').value = smiles;
+                alert(`SMILES captured: ${smiles}`);
+            });            
+            
+            // Update visible inputs and disable hidden ones
+            function updateInputView() {
+                const type = inputType.value;
+                sections.forEach(section => {
+                    if (section.id === `${type}Section`) {
+                        section.style.display = 'block';
+                        // Enable inputs in the active section
+                        Array.from(section.querySelectorAll('input, textarea')).forEach(input => {
+                            input.disabled = false;
+                        });
+                    } else {
+                        section.style.display = 'none';
+                        // Disable inputs in inactive sections so they don't submit unwanted data
+                        Array.from(section.querySelectorAll('input, textarea')).forEach(input => {
+                            input.disabled = true;
+                        });
+                    }
+                });
+        
+                // Special handling for JSME initialization
+                if (type === 'jsme_drawn' && !jsmeApplet) {
+                    initJSME();
+                }
+            }
+        
+            // Event handlers
+            inputType.addEventListener('change', updateInputView);
+        
+            // File upload feedback
+            document.getElementById('pdbFile')?.addEventListener('change', function(e) {
+                const fileName = e.target.files[0]?.name || 'Choose file';
+                document.querySelector('.custom-file-label').textContent = fileName;
+            });
+        
+            // Initial setup
+            updateInputView();
+        });
+        </script>        
+
+<style>
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.9);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        z-index: 9999;
+    }
+    .custom-select {
+        border-radius: 0.25rem;
+        transition: border-color 0.15s ease-in-out;
+    }
+    #jsme_container {
+        background: white;
+        min-height: 400px;
+    }
+</style>
+
+    </main>
+
+    <div id="global-alerts"></div>
+    
+</body>
+</html>
